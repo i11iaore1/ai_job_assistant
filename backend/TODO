@@ -1,0 +1,5 @@
+- fastapi setup
+- account crud: email, name, resume, context
+- pdf parsing for resume
+- error handling
+- logging
