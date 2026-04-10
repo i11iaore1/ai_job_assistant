@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from groq.types.shared_params.function_definition import FunctionDefinition
 
 
-class Preset(BaseModel):
+class PresetSchema(BaseModel):
     # preset for chat completion parameters
     tool_function_definition: FunctionDefinition
     get_system_message_content: Callable[..., str]

@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from .groq_service.client import SyncGroqClient
 
 
-load_dotenv()
+load_dotenv("env/.env")
 
 API_KEY = os.getenv("GROQ_API_KEY")
 

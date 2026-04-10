@@ -1,14 +1,14 @@
 from groq.types.shared_params.function_definition import FunctionDefinition
 
 from llm_service.constants import NOT_MENTIONED
-from llm_service.groq_service.presets.preset import Preset
-from llm_service.types import ReviewResult
+from llm_service.groq_service.presets.preset import PresetSchema
+from llm_service.schemas import LLMReviewResultSchema
 
 
 review_tool_function_definition: FunctionDefinition = {
     "name": "save_review_result",
     "description": "Saves the jobs review including: position, company_name, advantages, disadvantages, questions",
-    "parameters": ReviewResult.model_json_schema(),
+    "parameters": LLMReviewResultSchema.model_json_schema(),
 }
 
 
@@ -27,7 +27,7 @@ def user_message_template(
     return "\n".join(block for block in blocks if block is not None)
 
 
-review_preset = Preset(
+review_preset = PresetSchema(
     tool_function_definition=review_tool_function_definition,
     get_system_message_content=system_message_template,
     get_user_message_content=user_message_template,

@@ -1,5 +1,7 @@
 - fastapi setup
+- add readable API Documentation
 - account crud: email, name, resume, context
 - pdf parsing for resume
+- redis-caching for resume_text and context
 - error handling
 - logging

@@ -2,7 +2,7 @@
 # Edit at https://www.toptal.com/developers/gitignore?templates=windows,python,visualstudiocode,dotenv,venv
 
 ### dotenv ###
-.env
+*.env
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
@@ -128,9 +128,7 @@ celerybeat.pid
 
 # Environments
 .venv
-env/
 venv/
-ENV/
 env.bak/
 venv.bak/
 

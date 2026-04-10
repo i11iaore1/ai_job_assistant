@@ -1,11 +1,19 @@
 from abc import ABC, abstractmethod
 
-from llm_service.types import ReviewResult
+from schemas import ReviewSchema
 
 
 class SyncLLMClient(ABC):
     @abstractmethod
     def evaluate_vacancy(
         self, resume_text: str, context: str, vacancy_description: str
-    ) -> ReviewResult:
+    ) -> ReviewSchema:
+        pass
+
+
+class AsyncLLMClient(ABC):
+    @abstractmethod
+    async def evaluate_vacancy(
+        self, resume_text: str, context: str, vacancy_description: str
+    ) -> ReviewSchema:
         pass
