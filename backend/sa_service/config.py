@@ -32,3 +32,5 @@ class PostgresConfig(BaseSettings):
 
 
 pg_config = PostgresConfig()  # type: ignore
+
+CURRENT_DSN = pg_config.DSN_psycopg

@@ -1,13 +1,12 @@
 import json
 
-from groq import Groq, AsyncGroq
+from groq import AsyncGroq, Groq
 
 from errors.llm_service import LLMServiceException
-from llm_service.llm_service import SyncLLMClient, AsyncLLMClient
-from llm_service.groq_service.presets.review_preset import review_preset
 from llm_service.groq_service.config import MODEL
-from llm_service.schemas import LLMReviewResultSchema
-from schemas import ReviewSchema
+from llm_service.groq_service.presets.review_preset import review_preset
+from llm_service.llm_service import AsyncLLMClient, SyncLLMClient
+from llm_service.schemas import RawReviewSchema, ReviewSchema
 
 
 class SyncGroqClient(SyncLLMClient):
@@ -58,7 +57,7 @@ class SyncGroqClient(SyncLLMClient):
         arguments = json.loads(message.tool_calls[0].function.arguments)
 
         # TODO manage validation error
-        return LLMReviewResultSchema(**arguments).to_review()
+        return RawReviewSchema(**arguments).process()
 
 
 class AsyncGroqClient(AsyncLLMClient):
@@ -109,4 +108,4 @@ class AsyncGroqClient(AsyncLLMClient):
         arguments = json.loads(message.tool_calls[0].function.arguments)
 
         # TODO manage validation error
-        return LLMReviewResultSchema(**arguments).to_review()
+        return RawReviewSchema(**arguments).process()

@@ -2,13 +2,12 @@ from groq.types.shared_params.function_definition import FunctionDefinition
 
 from llm_service.constants import NOT_MENTIONED
 from llm_service.groq_service.presets.preset import PresetSchema
-from llm_service.schemas import LLMReviewResultSchema
-
+from llm_service.schemas import RawReviewSchema
 
 review_tool_function_definition: FunctionDefinition = {
-    "name": "save_review_result",
+    "name": "save_review",
     "description": "Saves the jobs review including: position, company_name, advantages, disadvantages, questions",
-    "parameters": LLMReviewResultSchema.model_json_schema(),
+    "parameters": RawReviewSchema.model_json_schema(),
 }
 
 
