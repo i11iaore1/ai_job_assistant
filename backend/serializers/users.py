@@ -5,6 +5,16 @@ from serializers.base_serializer import BaseDatedSerializer
 # DTOs
 
 
+class CreateUserSchema(BaseModel):
+    """DTO for creating a user DB record"""
+
+    email: EmailStr
+    # if username not provided it is generated from email
+    username: str | None = None
+    password: str
+    is_admin: bool = False
+
+
 class UserDBSchema(BaseDatedSerializer):
     """DTO for SAFE user DB record (no password_hash)"""
 
@@ -22,16 +32,21 @@ class UserProfileDBSchema(BaseDatedSerializer):
     context: str
 
 
+class UserCredentialsSchema(BaseModel):
+    """DTO for user credentials"""
+
+    email: EmailStr
+    password: str
+
+
 # registration
 
 
-class RegistrationSerializer(BaseModel):
+class RegistrationSerializer(UserCredentialsSchema):
     """validates registration request payload"""
 
-    email: EmailStr
     # if username not provided it is generated from email
     username: str | None = None
-    password: str
     remember_me: bool  # determines whether refresh is sent as Session Cookie or Long living (Max-Age: 2592000)
 
 
@@ -44,11 +59,9 @@ class RegistrationResponseSerializer(UserDBSchema):
 # login
 
 
-class LoginSerializer(BaseModel):
+class LoginSerializer(UserCredentialsSchema):
     """validates login request payload"""
 
-    email: EmailStr
-    password: str
     remember_me: bool  # determines whether refresh is sent as Session Cookie or Long living (Max-Age: 2592000)
 
 
@@ -56,4 +69,4 @@ class LoginResponseSerializer(UserDBSchema):
     """describes login response payload structure"""
 
     # user might not have a profile yet
-    profile_info: UserProfileDBSchema | None
+    profile: UserProfileDBSchema | None

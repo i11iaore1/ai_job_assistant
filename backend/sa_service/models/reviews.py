@@ -8,10 +8,10 @@ from sqlalchemy import Enum as SA_Enum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from sa_service.models.base_model import BaseModel
+from sa_service.models import BaseModel
 
 if TYPE_CHECKING:
-    from sa_service.models.users import UserModel
+    from sa_service.models import UserModel
 
 
 jsonb_list = Annotated[
@@ -41,10 +41,10 @@ class ReviewRequestModel(BaseModel):
         default=ReviewRequestStatus.PROCESSING,
     )
 
-    user: Mapped["UserModel"] = relationship(back_populates="requests")
+    user: Mapped["UserModel"] = relationship("UserModel", back_populates="requests")
 
     review: Mapped["ReviewModel"] = relationship(
-        back_populates="request", uselist=False
+        "ReviewModel", back_populates="request", uselist=False
     )
 
 
@@ -60,4 +60,6 @@ class ReviewModel(BaseModel):
     disadvantages: Mapped[jsonb_list]
     questions: Mapped[jsonb_list]
 
-    request: Mapped["ReviewRequestModel"] = relationship(back_populates="review")
+    request: Mapped["ReviewRequestModel"] = relationship(
+        "ReviewRequestModel", back_populates="review"
+    )

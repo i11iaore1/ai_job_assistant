@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING
 from sqlalchemy import ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from sa_service.models.base_model import BaseModel
+from sa_service.models import BaseModel
 from utils.password_context import pwd_context
 
 if TYPE_CHECKING:
-    from sa_service.models.reviews import ReviewRequestModel
+    from sa_service.models import ReviewRequestModel
 
 
 class UserModel(BaseModel):
@@ -22,10 +22,12 @@ class UserModel(BaseModel):
     is_admin: Mapped[bool]
 
     profile: Mapped["UserProfileModel"] = relationship(
-        back_populates="user", uselist=False
+        "UserProfileModel", back_populates="user", uselist=False
     )
 
-    requests: Mapped[list["ReviewRequestModel"]] = relationship(back_populates="user")
+    requests: Mapped[list["ReviewRequestModel"]] = relationship(
+        "ReviewRequestModel", back_populates="user"
+    )
 
     @property
     def password(self):
@@ -49,4 +51,4 @@ class UserProfileModel(BaseModel):
     resume_text: Mapped[str] = mapped_column(Text)
     context: Mapped[str] = mapped_column(Text)
 
-    user: Mapped["UserModel"] = relationship(back_populates="profile")
+    user: Mapped["UserModel"] = relationship("UserModel", back_populates="profile")
