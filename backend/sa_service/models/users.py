@@ -6,7 +6,7 @@ from sqlalchemy import ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from sa_service.models import BaseModel
-from utils.password_context import pwd_context
+from utils.security.password import hash_password, verify_password
 
 if TYPE_CHECKING:
     from sa_service.models import ReviewRequestModel
@@ -31,14 +31,14 @@ class UserModel(BaseModel):
 
     @property
     def password(self):
-        raise AttributeError("Password is not readable.")
+        raise AttributeError("Password is not readable")
 
     @password.setter
     def password(self, password_to_set: str):
-        self._password_hash = pwd_context.hash(password_to_set)
+        self._password_hash = hash_password(password_to_set)
 
-    def verify_password(self, password_to_check: str) -> bool:
-        return pwd_context.verify(password_to_check, self._password_hash)
+    def verify_password(self, password_to_verify: str) -> bool:
+        return verify_password(password_to_verify, self._password_hash)
 
 
 class UserProfileModel(BaseModel):

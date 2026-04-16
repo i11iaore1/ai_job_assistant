@@ -24,12 +24,25 @@ class UserDBSchema(BaseDatedSerializer):
     is_admin: bool
 
 
-class UserProfileDBSchema(BaseDatedSerializer):
-    """DTO for user profile DB record"""
+class CreateUserProfileSchema(BaseModel):
+    """DTO for creating a user profile DB record"""
 
     resume_file_path: str
     resume_text: str
     context: str
+
+
+class UserProfileDBSchema(CreateUserProfileSchema, BaseDatedSerializer):
+    """DTO for user profile DB record"""
+
+    pass
+
+
+class FullUserInfoSchema(UserDBSchema):
+    """DTO for full user info including profile DB record"""
+
+    # user might not have a profile yet
+    profile: UserProfileDBSchema | None
 
 
 class UserCredentialsSchema(BaseModel):
@@ -50,12 +63,6 @@ class RegistrationSerializer(UserCredentialsSchema):
     remember_me: bool  # determines whether refresh is sent as Session Cookie or Long living (Max-Age: 2592000)
 
 
-class RegistrationResponseSerializer(UserDBSchema):
-    """describes registration response payload structure"""
-
-    pass
-
-
 # login
 
 
@@ -63,10 +70,3 @@ class LoginSerializer(UserCredentialsSchema):
     """validates login request payload"""
 
     remember_me: bool  # determines whether refresh is sent as Session Cookie or Long living (Max-Age: 2592000)
-
-
-class LoginResponseSerializer(UserDBSchema):
-    """describes login response payload structure"""
-
-    # user might not have a profile yet
-    profile: UserProfileDBSchema | None
