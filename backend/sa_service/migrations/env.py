@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from sa_service.config import CURRENT_DSN
 from sa_service.models import (  # noqa: F401  # noqa: F401
-    BaseModel,
+    Base,
     ReviewModel,
     ReviewRequestModel,
     UserModel,
@@ -30,7 +30,7 @@ config.set_main_option("sqlalchemy.url", CURRENT_DSN)
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata = BaseModel.metadata
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

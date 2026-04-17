@@ -1,17 +1,7 @@
-from datetime import datetime
-
-from sqlalchemy import text
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase
 
 
-class BaseModel(DeclarativeBase):
-    created_at: Mapped[datetime] = mapped_column(
-        server_default=text("TIMEZONE('utc', now())")
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        server_default=text("TIMEZONE('utc', now())")
-    )
-
+class Base(DeclarativeBase):
     def __repr__(self) -> str:
         columns = [
             f"{column_name}={getattr(self, column_name)}"

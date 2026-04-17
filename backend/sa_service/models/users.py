@@ -1,18 +1,20 @@
 from __future__ import annotations
 
+import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Text
+from sqlalchemy import DateTime, ForeignKey, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from sa_service.models import BaseModel
+from sa_service.models import Base, TimestampMixin
 from utils.security.password import hash_password, verify_password
 
 if TYPE_CHECKING:
     from sa_service.models import ReviewRequestModel
 
 
-class UserModel(BaseModel):
+class UserModel(Base, TimestampMixin):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -41,7 +43,7 @@ class UserModel(BaseModel):
         return verify_password(password_to_verify, self._password_hash)
 
 
-class UserProfileModel(BaseModel):
+class UserProfileModel(Base, TimestampMixin):
     __tablename__ = "user_profiles"
 
     user_id: Mapped[int] = mapped_column(

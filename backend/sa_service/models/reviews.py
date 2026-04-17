@@ -8,7 +8,7 @@ from sqlalchemy import Enum as SA_Enum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from sa_service.models import BaseModel
+from sa_service.models import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from sa_service.models import UserModel
@@ -26,7 +26,7 @@ class ReviewRequestStatus(Enum):
     FAILED = "failed"
 
 
-class ReviewRequestModel(BaseModel):
+class ReviewRequestModel(Base, TimestampMixin):
     __tablename__ = "review_requests"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -48,7 +48,7 @@ class ReviewRequestModel(BaseModel):
     )
 
 
-class ReviewModel(BaseModel):
+class ReviewModel(Base, TimestampMixin):
     __tablename__ = "reviews"
 
     request_id: Mapped[int] = mapped_column(
