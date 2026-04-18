@@ -1,12 +1,12 @@
 from pydantic import BaseModel
 
-from llm_service.constants import NOT_MENTIONED
 from serializers.reviews import ReviewSchema
+from services.llm_service.constants import NOT_MENTIONED
 
 
 class RawReviewSchema(BaseModel):
-    position: str  # if None allowed, model might bahave "lazy"
-    company_name: str  # if None allowed, model might bahave "lazy"
+    position: str  # if None allowed, model might behave "lazy"
+    company_name: str  # if None allowed, model might behave "lazy"
     advantages: list[str]
     disadvantages: list[str]
     questions: list[str]

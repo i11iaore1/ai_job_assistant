@@ -4,8 +4,8 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from sa_service.models import UserModel
-from sa_service.models.users import RefreshTokenModel, UserProfileModel
+from sa.models import UserModel
+from sa.models.users import RefreshTokenModel, UserProfileModel
 from serializers.users import (
     CreateUserProfileSchema,
     CreateUserSchema,

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from schemas import ReviewSchema
+from services.llm_service.schemas import ReviewSchema
 
 
 class SyncLLMClient(ABC):

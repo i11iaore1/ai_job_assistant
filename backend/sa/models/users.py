@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING
 from sqlalchemy import DateTime, ForeignKey, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from sa_service.models import Base, TimestampMixin
+from sa.models import Base, TimestampMixin
 from utils.security.password import hash_password, verify_password
 
 if TYPE_CHECKING:
-    from sa_service.models import ReviewRequestModel
+    from sa.models import ReviewRequestModel
 
 
 class UserModel(Base, TimestampMixin):

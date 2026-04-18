@@ -8,10 +8,10 @@ from sqlalchemy import Enum as SA_Enum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from sa_service.models import Base, TimestampMixin
+from sa.models import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from sa_service.models import UserModel
+    from sa.models import UserModel
 
 
 jsonb_list = Annotated[

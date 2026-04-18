@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from sa_service.models.reviews import ReviewRequestStatus
+from sa.models.reviews import ReviewRequestStatus
 from serializers.base_serializer import BaseDatedSerializer
 
 # DTOs

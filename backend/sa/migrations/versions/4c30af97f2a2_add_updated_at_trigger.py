@@ -11,7 +11,7 @@ from typing import Sequence, Union
 from alembic import op
 from sqlalchemy import text
 
-from sa_service.update_trigger import (
+from sa.update_trigger import (
     create_on_update_trigger,
     create_on_update_trigger_func,
     drop_on_update_trigger,

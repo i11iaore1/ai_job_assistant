@@ -6,8 +6,8 @@ from dependencies.auth import (
     RefreshIdDependency,
     RefreshInfoDependency,
 )
-from sa_service.database import AsyncSessionDependency
-from sa_service.operations.users import (
+from sa.database import AsyncSessionDependency
+from sa.operations.users import (
     create_user,
     create_user_profile,
     delete_all_user_refresh_tokens,

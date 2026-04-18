@@ -4,7 +4,7 @@ from fastapi import Depends
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from sa_service.config import CURRENT_DSN
+from sa.config import CURRENT_DSN
 
 POOL_SIZE = 5
 MAX_OVERFLOW = 10

@@ -3,10 +3,10 @@ import json
 from groq import AsyncGroq, Groq
 
 from errors.llm_service import LLMServiceException
-from llm_service.groq_service.config import MODEL
-from llm_service.groq_service.presets.review_preset import review_preset
-from llm_service.llm_service import AsyncLLMClient, SyncLLMClient
-from llm_service.schemas import RawReviewSchema, ReviewSchema
+from services.llm_service.groq_service.config import MODEL
+from services.llm_service.groq_service.presets.review_preset import review_preset
+from services.llm_service.llm_service import AsyncLLMClient, SyncLLMClient
+from services.llm_service.schemas import RawReviewSchema, ReviewSchema
 
 
 class SyncGroqClient(SyncLLMClient):

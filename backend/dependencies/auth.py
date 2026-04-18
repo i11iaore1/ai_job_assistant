@@ -4,9 +4,9 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, Request
 from jwt import ExpiredSignatureError, PyJWTError
 
-from sa_service.database import AsyncSessionDependency
-from sa_service.models.users import UserModel
-from sa_service.operations.users import get_user_by_id
+from sa.database import AsyncSessionDependency
+from sa.models.users import UserModel
+from sa.operations.users import get_user_by_id
 from serializers.users import FullUserInfoSchema, UserDBSchema
 from utils.jwt_service import jwt_decode
 from utils.security.auth import (

@@ -1,8 +1,8 @@
 from groq.types.shared_params.function_definition import FunctionDefinition
 
-from llm_service.constants import NOT_MENTIONED
-from llm_service.groq_service.presets.preset import PresetSchema
-from llm_service.schemas import RawReviewSchema
+from services.llm_service.constants import NOT_MENTIONED
+from services.llm_service.groq_service.presets.preset import PresetSchema
+from services.llm_service.schemas import RawReviewSchema
 
 review_tool_function_definition: FunctionDefinition = {
     "name": "save_review",
