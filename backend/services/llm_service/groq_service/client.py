@@ -2,7 +2,7 @@ import json
 
 from groq import AsyncGroq, Groq
 
-from errors.llm_service import LLMServiceException
+from exceptions.llm_service import LLMServiceException
 from services.llm_service.groq_service.config import MODEL
 from services.llm_service.groq_service.presets.review_preset import review_preset
 from services.llm_service.llm_service import AsyncLLMClient, SyncLLMClient
@@ -52,7 +52,7 @@ class SyncGroqClient(SyncLLMClient):
         message = chat_response.choices[0].message
         if not message.tool_calls:
             print(message)
-            raise LLMServiceException
+            raise LLMServiceException()
 
         arguments = json.loads(message.tool_calls[0].function.arguments)
 
@@ -103,7 +103,7 @@ class AsyncGroqClient(AsyncLLMClient):
         message = chat_response.choices[0].message
         if not message.tool_calls:
             print(message)
-            raise LLMServiceException
+            raise LLMServiceException()
 
         arguments = json.loads(message.tool_calls[0].function.arguments)
 

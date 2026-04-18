@@ -17,10 +17,7 @@ async def create_user(
     session: AsyncSession,
     user_info: CreateUserSchema,
 ) -> UserModel:
-    user_info_dict = user_info.model_dump()
-    if not user_info_dict.get("username"):
-        user_info_dict["username"] = user_info_dict["email"].split("@")[0]
-    new_user = UserModel(**user_info_dict)
+    new_user = UserModel(**user_info.model_dump())
     session.add(new_user)
     await session.flush()
     await session.refresh(new_user)
@@ -76,9 +73,6 @@ async def create_user_profile(
     user_id: int,
     profile_info: CreateUserProfileSchema,
 ) -> UserProfileModel:
-    # profile_info_dict = profile_info.model_dump()
-    # profile_info_dict["user_id"] = user_id
-    # new_profile = UserProfileModel(**profile_info_dict)
     new_profile = UserProfileModel(user_id=user_id, **profile_info.model_dump())
     session.add(new_profile)
     await session.flush()

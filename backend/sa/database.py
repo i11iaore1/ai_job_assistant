@@ -34,7 +34,13 @@ SessionLocal = async_sessionmaker(
 
 async def get_async_session():
     async with SessionLocal() as session:
-        yield session
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
 
 
 AsyncSessionDependency = Annotated[AsyncSession, Depends(get_async_session)]
