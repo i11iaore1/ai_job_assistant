@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from sa_service.config import CURRENT_DSN
 from sa_service.models import (  # noqa: F401  # noqa: F401
     Base,
+    RefreshTokenModel,
     ReviewModel,
     ReviewRequestModel,
     UserModel,

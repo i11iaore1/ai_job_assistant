@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, EmailStr
 
 from serializers.base_serializer import BaseDatedSerializer
@@ -70,3 +72,14 @@ class LoginSerializer(UserCredentialsSchema):
     """validates login request payload"""
 
     remember_me: bool  # determines whether refresh is sent as Session Cookie or Long living (Max-Age: 2592000)
+
+
+# refresh token
+
+
+class RefreshTokenSchema(BaseModel):
+    """DTO for refresh token DB record"""
+
+    jti: str
+    user_id: str
+    expires_at: datetime

@@ -1,13 +1,18 @@
 from typing import Sequence
+from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from sa_service.models import UserModel
-from sa_service.models.users import UserProfileModel
-from serializers.users import CreateUserProfileSchema, CreateUserSchema
+from sa_service.models.users import RefreshTokenModel, UserProfileModel
+from serializers.users import (
+    CreateUserProfileSchema,
+    CreateUserSchema,
+    RefreshTokenSchema,
+)
 
 
 class EmailExists(Exception):
@@ -60,6 +65,32 @@ async def get_user_by_email(
         query = query.options(joinedload(UserModel.profile))
     result = await session.execute(query)
     return result.scalars().first()
+
+
+async def record_refresh_token(
+    session: AsyncSession, token_info: RefreshTokenSchema
+) -> None:
+    refresh_token_dict = token_info.model_dump()
+    new_refresh_token = RefreshTokenModel(**refresh_token_dict)
+    session.add(new_refresh_token)
+    try:
+        await session.flush()
+    except IntegrityError:
+        await session.rollback()
+
+
+async def delete_refresh_token(session: AsyncSession, token_id: UUID) -> bool:
+    token = await session.get(RefreshTokenModel, token_id)
+    if token:
+        await session.delete(token)
+        await session.flush()
+        return True
+    return False
+
+
+async def delete_all_user_refresh_tokens(session: AsyncSession, user_id: int):
+    query = delete(RefreshTokenModel).where(RefreshTokenModel.user_id == user_id)
+    await session.execute(query)
 
 
 class ProfileExists(Exception):

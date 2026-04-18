@@ -1,4 +1,5 @@
-from typing import Annotated, Any
+from typing import Annotated, Any, NamedTuple
+from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request
 from jwt import ExpiredSignatureError, PyJWTError
@@ -21,7 +22,7 @@ class TokenPayloadGetter:
         self.token_config = token_config
 
     def __call__(self, request: Request) -> dict[str, Any]:
-        token = request.cookies.get(self.token_config.cookie_attrs.key)
+        token = request.cookies.get(self.token_config.default_cookie_attrs.key)
         if not token:
             raise HTTPException(status_code=401, detail="Not authenticated")
 
@@ -80,14 +81,65 @@ async def get_admin_from_access_token(
     return current_user
 
 
-async def get_user_from_refresh_token(
+class RefreshTokenInfo(NamedTuple):
+    id: UUID
+    persistant: bool
+
+
+class InfoForRefresh(NamedTuple):
+    token_info: RefreshTokenInfo
+    current_user: UserDBSchema
+
+
+async def get_info_for_refresh(
     session: AsyncSessionDependency,
     payload: dict[str, Any] = Depends(get_refresh_token_payload),
-) -> UserDBSchema:
-    current_user = await get_user_db_record_from_token(
-        session=session, payload=payload, with_profile=False
+) -> InfoForRefresh:
+    user_id = payload.get(PayloadKeys.SUBJECT)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not provided")
+    refresh_id_string = payload.get(PayloadKeys.JWT_ID)
+    if not refresh_id_string:
+        raise HTTPException(status_code=401, detail="JTI not provided")
+    try:
+        refresh_id = UUID(refresh_id_string)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid JTI format")
+
+    persistant = payload.get(PayloadKeys.PERSISTANT)
+    if persistant is None:
+        raise HTTPException(status_code=401, detail="Persistance not provided")
+    if not isinstance(persistant, bool):
+        raise HTTPException(status_code=401, detail="Invalid persistance format")
+
+    current_user = await get_user_by_id(
+        session=session, user_id=int(user_id), with_profile=False
     )
-    return UserDBSchema.model_validate(current_user, from_attributes=True)
+    if current_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user_dto = UserDBSchema.model_validate(current_user, from_attributes=True)
+
+    return InfoForRefresh(
+        token_info=RefreshTokenInfo(id=refresh_id, persistant=persistant),
+        current_user=user_dto,
+    )
+
+
+def get_jti_for_logout(request: Request) -> UUID | None:
+    token = request.cookies.get(refresh_token_config.default_cookie_attrs.key)
+    if not token:
+        return None
+    try:
+        # if token is expired it should be deleted
+        # so ExpiredSignatureError error should be ignored
+        payload = jwt_decode(token, verify_exp=False)
+        jti_string = payload.get(PayloadKeys.JWT_ID)
+        if not jti_string:
+            return None
+        return UUID(jti_string)
+    except (PyJWTError, ValueError):
+        return None
 
 
 AccessUserDependency = Annotated[
@@ -96,4 +148,5 @@ AccessUserDependency = Annotated[
 AccessAdminDependency = Annotated[
     FullUserInfoSchema, Depends(get_admin_from_access_token)
 ]
-RefreshUserDependency = Annotated[UserDBSchema, Depends(get_user_from_refresh_token)]
+RefreshInfoDependency = Annotated[InfoForRefresh, Depends(get_info_for_refresh)]
+RefreshIdDependency = Annotated[UUID | None, Depends(get_jti_for_logout)]

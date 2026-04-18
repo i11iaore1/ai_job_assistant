@@ -1,14 +1,21 @@
 import uvicorn
 from fastapi import FastAPI, HTTPException, Response
 
-from dependencies.auth import AccessUserDependency, RefreshUserDependency
+from dependencies.auth import (
+    AccessUserDependency,
+    RefreshIdDependency,
+    RefreshInfoDependency,
+)
 from sa_service.database import AsyncSessionDependency
 from sa_service.operations.users import (
     EmailExists,
     create_user,
     create_user_profile,
+    delete_all_user_refresh_tokens,
+    delete_refresh_token,
     get_user_by_email,
     get_users,
+    record_refresh_token,
 )
 from serializers.users import (
     CreateUserProfileSchema,
@@ -21,6 +28,7 @@ from serializers.users import (
 )
 from utils.security.auth import (
     delete_token_cookies,
+    generate_token_pair,
     set_token_cookies,
 )
 
@@ -54,9 +62,10 @@ async def register(
             status_code=409, detail="User with this email already exists"
         )
     new_user_dto = UserDBSchema.model_validate(new_user, from_attributes=True)
-    set_token_cookies(
-        user=new_user_dto, response=response, remember_me=payload.remember_me
-    )
+    token_pair = generate_token_pair(user=new_user_dto, persistant=payload.remember_me)
+    await record_refresh_token(session=session, token_info=token_pair.refresh.data)
+    await session.commit()
+    set_token_cookies(token_pair=token_pair, response=response)
     return new_user_dto
 
 
@@ -72,12 +81,20 @@ async def login(
     if user is None or not user.verify_password(payload.password):
         raise HTTPException(status_code=401, detail="Wrong email or password")
     user_dto = FullUserInfoSchema.model_validate(user, from_attributes=True)
-    set_token_cookies(user=user_dto, response=response, remember_me=payload.remember_me)
+    token_pair = generate_token_pair(user=user_dto, persistant=payload.remember_me)
+    await record_refresh_token(session=session, token_info=token_pair.refresh.data)
+    await session.commit()
+    set_token_cookies(token_pair=token_pair, response=response)
     return user_dto
 
 
 @app.post("/logout")
-async def logout(response: Response):
+async def logout(
+    response: Response, session: AsyncSessionDependency, refresh_id: RefreshIdDependency
+):
+    if refresh_id:
+        await delete_refresh_token(session=session, token_id=refresh_id)
+        await session.commit()
     delete_token_cookies(response)
     return {"message": "Logged out"}
 
@@ -85,9 +102,31 @@ async def logout(response: Response):
 @app.post("/refresh")
 async def refresh(
     response: Response,
-    current_user: RefreshUserDependency,
+    session: AsyncSessionDependency,
+    refresh_info: RefreshInfoDependency,
 ):
-    set_token_cookies(user=current_user, response=response, remember_me=True)
+    was_deleted = await delete_refresh_token(
+        session=session, token_id=refresh_info.token_info.id
+    )
+    if not was_deleted:
+        await delete_all_user_refresh_tokens(
+            session=session, user_id=refresh_info.current_user.id
+        )
+        await session.commit()
+        delete_token_cookies(response)
+        raise HTTPException(
+            status_code=401, detail="Security alert: Token reuse detected"
+        )
+
+    user_dto = UserDBSchema.model_validate(
+        refresh_info.current_user, from_attributes=True
+    )
+    token_pair = generate_token_pair(
+        user=user_dto, persistant=refresh_info.token_info.persistant
+    )
+    await record_refresh_token(session=session, token_info=token_pair.refresh.data)
+    await session.commit()
+    set_token_cookies(token_pair=token_pair, response=response)
     return {"message": "Refreshed"}
 
 

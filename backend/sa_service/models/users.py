@@ -43,6 +43,16 @@ class UserModel(Base, TimestampMixin):
         return verify_password(password_to_verify, self._password_hash)
 
 
+class RefreshTokenModel(Base):
+    __tablename__ = "refresh_tokens"
+
+    jti: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
 class UserProfileModel(Base, TimestampMixin):
     __tablename__ = "user_profiles"
 
