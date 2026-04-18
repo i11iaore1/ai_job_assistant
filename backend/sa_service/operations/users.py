@@ -1,8 +1,6 @@
-from typing import Sequence
 from uuid import UUID
 
 from sqlalchemy import delete, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -15,12 +13,6 @@ from serializers.users import (
 )
 
 
-class EmailExists(Exception):
-    """User with this email already exists"""
-
-    pass
-
-
 async def create_user(
     session: AsyncSession,
     user_info: CreateUserSchema,
@@ -30,21 +22,9 @@ async def create_user(
         user_info_dict["username"] = user_info_dict["email"].split("@")[0]
     new_user = UserModel(**user_info_dict)
     session.add(new_user)
-    try:
-        await session.commit()
-    except IntegrityError:
-        await session.rollback()
-        raise EmailExists
+    await session.flush()
     await session.refresh(new_user)
     return new_user
-
-
-async def get_users(
-    session: AsyncSession,
-) -> Sequence[UserModel]:
-    query = select(UserModel)
-    result = await session.execute(query)
-    return result.scalars().all()
 
 
 async def get_user_by_id(
@@ -73,10 +53,7 @@ async def record_refresh_token(
     refresh_token_dict = token_info.model_dump()
     new_refresh_token = RefreshTokenModel(**refresh_token_dict)
     session.add(new_refresh_token)
-    try:
-        await session.flush()
-    except IntegrityError:
-        await session.rollback()
+    await session.flush()
 
 
 async def delete_refresh_token(session: AsyncSession, token_id: UUID) -> bool:
@@ -91,12 +68,7 @@ async def delete_refresh_token(session: AsyncSession, token_id: UUID) -> bool:
 async def delete_all_user_refresh_tokens(session: AsyncSession, user_id: int):
     query = delete(RefreshTokenModel).where(RefreshTokenModel.user_id == user_id)
     await session.execute(query)
-
-
-class ProfileExists(Exception):
-    """User already created an profile"""
-
-    pass
+    await session.flush()
 
 
 async def create_user_profile(
@@ -104,14 +76,11 @@ async def create_user_profile(
     user_id: int,
     profile_info: CreateUserProfileSchema,
 ) -> UserProfileModel:
-    profile_info_dict = profile_info.model_dump()
-    profile_info_dict["user_id"] = user_id
-    new_profile = UserProfileModel(**profile_info_dict)
+    # profile_info_dict = profile_info.model_dump()
+    # profile_info_dict["user_id"] = user_id
+    # new_profile = UserProfileModel(**profile_info_dict)
+    new_profile = UserProfileModel(user_id=user_id, **profile_info.model_dump())
     session.add(new_profile)
-    try:
-        await session.commit()
-    except IntegrityError:
-        await session.rollback()
-        raise ProfileExists
+    await session.flush()
     await session.refresh(new_profile)
     return new_profile

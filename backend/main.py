@@ -1,5 +1,6 @@
 import uvicorn
 from fastapi import FastAPI, HTTPException, Response
+from sqlalchemy.exc import IntegrityError
 
 from dependencies.auth import (
     AccessUserDependency,
@@ -8,13 +9,11 @@ from dependencies.auth import (
 )
 from sa_service.database import AsyncSessionDependency
 from sa_service.operations.users import (
-    EmailExists,
     create_user,
     create_user_profile,
     delete_all_user_refresh_tokens,
     delete_refresh_token,
     get_user_by_email,
-    get_users,
     record_refresh_token,
 )
 from serializers.users import (
@@ -35,19 +34,6 @@ from utils.security.auth import (
 app = FastAPI()
 
 
-@app.get("/users", response_model=list[UserDBSchema])
-async def get_user_list(
-    session: AsyncSessionDependency,
-) -> list[UserDBSchema]:
-    users = await get_users(session=session)
-
-    user_dto_list = [
-        UserDBSchema.model_validate(user, from_attributes=True) for user in users
-    ]
-
-    return user_dto_list
-
-
 @app.post("/register", response_model=UserDBSchema)
 async def register(
     payload: RegistrationSerializer,
@@ -57,13 +43,20 @@ async def register(
     user_info = CreateUserSchema(**payload.model_dump())
     try:
         new_user = await create_user(session=session, user_info=user_info)
-    except EmailExists:
+    except IntegrityError:
+        await session.rollback()
         raise HTTPException(
             status_code=409, detail="User with this email already exists"
         )
     new_user_dto = UserDBSchema.model_validate(new_user, from_attributes=True)
     token_pair = generate_token_pair(user=new_user_dto, persistant=payload.remember_me)
-    await record_refresh_token(session=session, token_info=token_pair.refresh.data)
+    try:
+        await record_refresh_token(session=session, token_info=token_pair.refresh.data)
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(
+            status_code=409, detail="Conflict during refresh-token creation"
+        )
     await session.commit()
     set_token_cookies(token_pair=token_pair, response=response)
     return new_user_dto
@@ -82,7 +75,13 @@ async def login(
         raise HTTPException(status_code=401, detail="Wrong email or password")
     user_dto = FullUserInfoSchema.model_validate(user, from_attributes=True)
     token_pair = generate_token_pair(user=user_dto, persistant=payload.remember_me)
-    await record_refresh_token(session=session, token_info=token_pair.refresh.data)
+    try:
+        await record_refresh_token(session=session, token_info=token_pair.refresh.data)
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(
+            status_code=409, detail="Conflict during refresh-token creation"
+        )
     await session.commit()
     set_token_cookies(token_pair=token_pair, response=response)
     return user_dto
@@ -117,14 +116,19 @@ async def refresh(
         raise HTTPException(
             status_code=401, detail="Security alert: Token reuse detected"
         )
-
     user_dto = UserDBSchema.model_validate(
         refresh_info.current_user, from_attributes=True
     )
     token_pair = generate_token_pair(
         user=user_dto, persistant=refresh_info.token_info.persistant
     )
-    await record_refresh_token(session=session, token_info=token_pair.refresh.data)
+    try:
+        await record_refresh_token(session=session, token_info=token_pair.refresh.data)
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(
+            status_code=409, detail="Conflict during refresh-token creation"
+        )
     await session.commit()
     set_token_cookies(token_pair=token_pair, response=response)
     return {"message": "Refreshed"}
@@ -137,10 +141,14 @@ async def create_profile(
     current_user: AccessUserDependency,
 ):
     if current_user.profile:
-        raise HTTPException(status_code=409, detail="User already created an profile")
-    new_profile = await create_user_profile(
-        session=session, user_id=current_user.id, profile_info=payload
-    )
+        raise HTTPException(status_code=409, detail="User already has a profile")
+    try:
+        new_profile = await create_user_profile(
+            session=session, user_id=current_user.id, profile_info=payload
+        )
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="Conflict during profile creation")
     new_profile_dto = UserProfileDBSchema.model_validate(
         new_profile, from_attributes=True
     )
