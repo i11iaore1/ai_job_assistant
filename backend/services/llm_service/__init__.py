@@ -1,18 +1,7 @@
-import os
-from dotenv import load_dotenv
+from services.llm_service.groq_service.client_singletone import async_groq_client
+from services.llm_service.llm_service import AsyncLLMClient
 
-from .groq_service.client import SyncGroqClient
-
-
-load_dotenv("env/.env")
-
-API_KEY = os.getenv("GROQ_API_KEY")
-
-if API_KEY is None:
-    # TODO error handling
-    raise Exception()
-
-llm_client = SyncGroqClient(API_KEY)
-
+# SyncLLMClient | AsyncLLMClient
+llm_client: AsyncLLMClient = async_groq_client
 
 __all__ = ["llm_client"]

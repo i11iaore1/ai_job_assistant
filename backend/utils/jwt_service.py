@@ -1,11 +1,10 @@
-import os
 from typing import Any
 
 import jwt
-from dotenv import load_dotenv
 
-load_dotenv("env/.env")
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+from config import app_config
+
+JWT_SECRET_KEY = app_config.JWT_SECRET_KEY.get_secret_value()
 
 ALGORITHM = "HS256"
 
