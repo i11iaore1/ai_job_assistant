@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr
+from pydantic import UUID4, BaseModel, EmailStr
 
 from serializers.base_serializer import BaseDatedSerializer
 
@@ -11,10 +11,15 @@ class CreateUserSchema(BaseModel):
     """DTO for creating a user DB record"""
 
     email: EmailStr
-    # if username not provided it is generated from email
-    username: str | None = None
+    username: str
     password: str
     is_admin: bool = False
+
+
+class UpdateUserSchema(BaseModel):
+    """DTO for updating a user DB record"""
+
+    username: str | None
 
 
 class UserDBSchema(BaseDatedSerializer):
@@ -80,6 +85,6 @@ class LoginSerializer(UserCredentialsSchema):
 class RefreshTokenSchema(BaseModel):
     """DTO for refresh token DB record"""
 
-    jti: str
-    user_id: str
+    jti: UUID4
+    user_id: int
     expires_at: datetime

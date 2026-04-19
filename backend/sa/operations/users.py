@@ -10,6 +10,7 @@ from serializers.users import (
     CreateUserProfileSchema,
     CreateUserSchema,
     RefreshTokenSchema,
+    UpdateUserSchema,
 )
 
 
@@ -44,6 +45,22 @@ async def get_user_by_email(
     return result.scalars().first()
 
 
+async def update_user(
+    session: AsyncSession, user: UserModel, info_to_update: UpdateUserSchema
+) -> UserModel:
+    update_data = info_to_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(user, key, value)
+    await session.flush()
+    await session.refresh(user)
+    return user
+
+
+async def delete_user(session: AsyncSession, user: UserModel) -> None:
+    await session.delete(user)
+    await session.flush()
+
+
 async def record_refresh_token(
     session: AsyncSession, token_info: RefreshTokenSchema
 ) -> None:
@@ -62,7 +79,7 @@ async def delete_refresh_token(session: AsyncSession, token_id: UUID) -> bool:
     return False
 
 
-async def delete_all_user_refresh_tokens(session: AsyncSession, user_id: int):
+async def delete_all_user_refresh_tokens(session: AsyncSession, user_id: int) -> None:
     query = delete(RefreshTokenModel).where(RefreshTokenModel.user_id == user_id)
     await session.execute(query)
     await session.flush()

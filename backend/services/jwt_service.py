@@ -1,12 +1,11 @@
 from datetime import datetime, timedelta, timezone
+from uuid import UUID
 
 from fastapi import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dependencies.auth import InfoForRefresh
 from exceptions.jwt_service import TokenReuse
 from sa.operations.users import (
-    delete_all_user_refresh_tokens,
     delete_refresh_token,
     record_refresh_token,
 )
@@ -43,21 +42,17 @@ async def generate_token_pair(
         user=user, expiration=refresh_exp, persistant=persistant
     )
 
-    await record_refresh_token(session=session, token_info=refresh_token.data)
+    await record_refresh_token(session=session, token_info=refresh_token.db_data)
 
     return TokenPair(access=access_token, refresh=refresh_token)
 
 
 async def delete_previous_refresh_token(
-    session: AsyncSession, refresh_info: InfoForRefresh
-):
-    was_deleted = await delete_refresh_token(
-        session=session, token_id=refresh_info.token_info.id
-    )
+    session: AsyncSession,
+    token_id: UUID,
+) -> None:
+    was_deleted = await delete_refresh_token(session=session, token_id=token_id)
     if not was_deleted:
-        await delete_all_user_refresh_tokens(
-            session=session, user_id=refresh_info.current_user.id
-        )
         raise TokenReuse()
 
 

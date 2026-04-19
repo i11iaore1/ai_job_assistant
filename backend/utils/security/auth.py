@@ -1,9 +1,41 @@
-import uuid
 from datetime import datetime
 from typing import Final, Literal, NamedTuple
+from uuid import uuid4
+
+from pydantic import UUID4, BaseModel, Field
 
 from serializers.users import RefreshTokenSchema, UserDBSchema
 from utils.jwt_service import jwt_encode
+
+
+class TokenPayloadKeys:
+    # general
+    SUBJECT: Final = "sub"
+    TYPE: Final = "typ"
+    EXPIRATION: Final = "exp"
+    # access
+    ADMIN: Final = "adm"
+    # refresh
+    JWT_ID: Final = "jti"
+    PERSISTANT: Final = "pnt"
+
+
+class AccessTokenPayloadSchema(BaseModel):
+    subject: int = Field(serialization_alias=TokenPayloadKeys.SUBJECT)
+    type: str = Field(serialization_alias=TokenPayloadKeys.TYPE)
+    expiration: datetime = Field(serialization_alias=TokenPayloadKeys.EXPIRATION)
+    is_admin: bool = Field(serialization_alias=TokenPayloadKeys.ADMIN)
+
+
+class RefreshTokenPayloadSchema(BaseModel):
+    subject: int = Field(serialization_alias=TokenPayloadKeys.SUBJECT)
+    type: str = Field(serialization_alias=TokenPayloadKeys.TYPE)
+    expiration: datetime = Field(serialization_alias=TokenPayloadKeys.EXPIRATION)
+    jwt_id: UUID4 = Field(serialization_alias=TokenPayloadKeys.JWT_ID)
+    is_persistant: bool = Field(serialization_alias=TokenPayloadKeys.PERSISTANT)
+
+
+TokenPayloadSchema = type[AccessTokenPayloadSchema] | type[RefreshTokenPayloadSchema]
 
 
 class CookieAttributes(NamedTuple):
@@ -15,8 +47,9 @@ class CookieAttributes(NamedTuple):
     secure: bool
 
 
-class TokenConfig(NamedTuple):
+class TokenConfig[T: TokenPayloadSchema](BaseModel):
     type_label: str
+    payload_validation_model: T
     exp_seconds: int
     shorter_exp_seconds: int
     default_cookie_attrs: CookieAttributes
@@ -24,6 +57,7 @@ class TokenConfig(NamedTuple):
 
 access_token_config = TokenConfig(
     type_label="access",
+    payload_validation_model=AccessTokenPayloadSchema,
     exp_seconds=30 * 60,  # 30 minutes
     shorter_exp_seconds=10 * 60,  # 10 minutes
     default_cookie_attrs=CookieAttributes(
@@ -38,29 +72,18 @@ access_token_config = TokenConfig(
 
 refresh_token_config = TokenConfig(
     type_label="refresh",
+    payload_validation_model=RefreshTokenPayloadSchema,
     exp_seconds=7 * 24 * 3600,  # 7 days
     shorter_exp_seconds=3600,  # 1 hour
     default_cookie_attrs=CookieAttributes(
         key="refresh",
         max_age=7 * 24 * 3600,  # 7 days
         httponly=True,
-        path="/refresh",
+        path="/auth",
         samesite="lax",
         secure=False,
     ),
 )
-
-
-class PayloadKeys:
-    # general
-    SUBJECT: Final = "sub"
-    TYPE: Final = "typ"
-    EXPIRATION: Final = "exp"
-    # access
-    ADMIN: Final = "adm"
-    # refresh
-    JWT_ID: Final = "jti"
-    PERSISTANT: Final = "pnt"
 
 
 class AccessToken(NamedTuple):
@@ -68,7 +91,7 @@ class AccessToken(NamedTuple):
 
 
 class RefreshToken(NamedTuple):
-    data: RefreshTokenSchema
+    db_data: RefreshTokenSchema
     encoded: str
 
 
@@ -78,31 +101,32 @@ class TokenPair(NamedTuple):
 
 
 def generate_access_token(user: UserDBSchema, expiration: datetime) -> AccessToken:
-    user_id = str(user.id)
+    payload = AccessTokenPayloadSchema(
+        subject=user.id,
+        type=access_token_config.type_label,
+        is_admin=user.is_admin,
+        expiration=expiration,
+    )
 
-    payload = {
-        PayloadKeys.SUBJECT: user_id,
-        PayloadKeys.TYPE: access_token_config.type_label,
-        PayloadKeys.ADMIN: user.is_admin,
-        PayloadKeys.EXPIRATION: expiration,
-    }
-    return AccessToken(encoded=jwt_encode(payload))
+    return AccessToken(encoded=jwt_encode(payload.model_dump(mode="json")))
 
 
 def generate_refresh_token(
     user: UserDBSchema, expiration: datetime, persistant: bool
 ) -> RefreshToken:
-    user_id = str(user.id)
-    jti = str(uuid.uuid4())
+    jti = uuid4()
 
-    payload = {
-        PayloadKeys.SUBJECT: user_id,
-        PayloadKeys.TYPE: refresh_token_config.type_label,
-        PayloadKeys.EXPIRATION: expiration,
-        PayloadKeys.JWT_ID: jti,
-        PayloadKeys.PERSISTANT: persistant,
-    }
+    payload = RefreshTokenPayloadSchema(
+        subject=user.id,
+        type=refresh_token_config.type_label,
+        expiration=expiration,
+        jwt_id=jti,
+        is_persistant=persistant,
+    )
 
-    token_dto = RefreshTokenSchema(jti=jti, user_id=user_id, expires_at=expiration)
+    token_dto = RefreshTokenSchema(jti=jti, user_id=user.id, expires_at=expiration)
 
-    return RefreshToken(data=token_dto, encoded=jwt_encode(payload))
+    return RefreshToken(
+        db_data=token_dto,
+        encoded=jwt_encode(payload.model_dump(mode="json")),
+    )

@@ -23,3 +23,19 @@ class ProfileConflict(BaseAppException):
             message="User already has a profile",
             status_code=409,
         )
+
+
+class UserNotFound(BaseAppException):
+    def __init__(self):
+        super().__init__(
+            message="User not found",
+            status_code=404,
+        )
+
+
+class NotAdmin(BaseAppException):
+    def __init__(self):
+        super().__init__(
+            message="User doesn't have enough privileges",
+            status_code=403,
+        )
