@@ -4,7 +4,7 @@ import jwt
 
 from config import app_config
 
-JWT_SECRET_KEY = app_config.JWT_SECRET_KEY.get_secret_value()
+JWT_SECRET_KEY = app_config.jwt_secret.get_secret_value()
 
 ALGORITHM = "HS256"
 

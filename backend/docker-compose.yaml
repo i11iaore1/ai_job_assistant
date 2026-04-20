@@ -1,13 +1,25 @@
 services:
   database:
     image: postgres:15-alpine
+    ports:
+      - "${PG_EXT_PORT}:5432"
     env_file:
       - ./env/postgres.env
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "${MINIO_API_PORT}:9000"
+      - "${MINIO_CONSOLE_PORT}:9001"
+    env_file:
+      - ./env/minio.env
+    volumes:
+      - minio_data:/data
     restart: unless-stopped
 
 volumes:
   postgres_data:
+  minio_data:

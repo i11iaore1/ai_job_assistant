@@ -1,25 +1,27 @@
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
 
 class PostgresConfig(BaseSettings):
-    POSTGRES_DB: str
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: SecretStr
-    POSTGRES_HOST: str
-    POSTGRES_PORT: int
+    db_name: str = Field(validation_alias="POSTGRES_DB")
+    user: str = Field(validation_alias="POSTGRES_USER")
+    password: SecretStr = Field(validation_alias="POSTGRES_PASSWORD")
+    host: str = Field(validation_alias="PG_HOST", default="localhost")
+    port: int = Field(validation_alias="PG_EXT_PORT")
 
-    model_config = SettingsConfigDict(env_file="env/postgres.env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=(".env", "env/postgres.env", "env/app.env"), extra="ignore"
+    )
 
     def _get_DSN(self, driver: str) -> str:
         return URL.create(
             drivername=f"postgresql+{driver}",
-            username=self.POSTGRES_USER,
-            password=self.POSTGRES_PASSWORD.get_secret_value(),
-            host=self.POSTGRES_HOST,
-            port=self.POSTGRES_PORT,
-            database=self.POSTGRES_DB,
+            username=self.user,
+            password=self.password.get_secret_value(),
+            host=self.host,
+            port=self.port,
+            database=self.db_name,
         ).render_as_string(hide_password=False)
 
     @property

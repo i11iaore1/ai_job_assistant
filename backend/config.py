@@ -1,12 +1,12 @@
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AppConfig(BaseSettings):
-    GROQ_API_KEY: SecretStr
-    JWT_SECRET_KEY: SecretStr
+    groq_api_key: SecretStr = Field(validation_alias="GROQ_API_KEY")
+    jwt_secret: SecretStr = Field(validation_alias="JWT_SECRET_KEY")
 
-    model_config = SettingsConfigDict(env_file="env/.env", extra="ignore")
+    model_config = SettingsConfigDict(env_file="env/app.env", extra="ignore")
 
 
 app_config = AppConfig()  # type: ignore
