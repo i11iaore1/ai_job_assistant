@@ -5,11 +5,11 @@ from groq.types.chat.chat_completion import ChatCompletion
 from pydantic import ValidationError
 
 from exceptions.llm_service import LLMRequestProcessedIncorrectly
+from services.llm_service.base import AsyncLLMClient, SyncLLMClient
 from services.llm_service.groq_service.presets.review_preset import (
     get_review_completion_params,
 )
 from services.llm_service.groq_service.schemas import RawReviewSchema, ReviewSchema
-from services.llm_service.llm_service import AsyncLLMClient, SyncLLMClient
 
 
 class ProcessCompletionMixin(ABC):
