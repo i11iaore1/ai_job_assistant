@@ -4,15 +4,13 @@ from sqlalchemy import URL
 
 
 class PostgresConfig(BaseSettings):
-    db_name: str = Field(validation_alias="POSTGRES_DB")
-    user: str = Field(validation_alias="POSTGRES_USER")
-    password: SecretStr = Field(validation_alias="POSTGRES_PASSWORD")
-    host: str = Field(validation_alias="PG_HOST", default="localhost")
-    port: int = Field(validation_alias="PG_EXT_PORT")
+    db_name: str = Field(validation_alias="PSQL_DB")
+    user: str = Field(validation_alias="PSQL_USER")
+    password: SecretStr = Field(validation_alias="PSQL_PASSWORD")
+    host: str = Field(validation_alias="PSQL_HOST")
+    port: int = Field(validation_alias="PSQL_PORT")
 
-    model_config = SettingsConfigDict(
-        env_file=(".env", "env/postgres.env", "env/app.env"), extra="ignore"
-    )
+    model_config = SettingsConfigDict(extra="ignore")
 
     def _get_DSN(self, driver: str) -> str:
         return URL.create(

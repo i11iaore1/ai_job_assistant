@@ -2,8 +2,7 @@
 # Edit at https://www.toptal.com/developers/gitignore?templates=windows,python,visualstudiocode,dotenv,venv
 
 ### dotenv ###
-env/*.env
-# not "*.env" because .env file in root directory only contains variables for docker-compose
+*.env
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
