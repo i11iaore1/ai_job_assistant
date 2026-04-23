@@ -95,3 +95,11 @@ async def create_user_profile(
     await session.flush()
     await session.refresh(new_profile)
     return new_profile
+
+
+async def get_profile_by_user_id(
+    session: AsyncSession, user_id: int
+) -> UserProfileModel | None:
+    query = select(UserProfileModel).filter(UserProfileModel.user_id == user_id)
+    result = await session.execute(query)
+    return result.scalars().first()

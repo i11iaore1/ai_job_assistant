@@ -1,6 +1,10 @@
-from fastapi import APIRouter, Response
+import io
+
+from fastapi import APIRouter, Form, Response, UploadFile
+from fastapi.responses import StreamingResponse
 
 from dependencies.auth import (
+    AccessTokenPayloadDependency,
     FullUserFromAccessDependency,
     RefreshIdDependency,
     RefreshTokenPayloadDependency,
@@ -16,7 +20,6 @@ from sa.operations.users import (
     update_user,
 )
 from serializers.users import (
-    CreateUserProfileSchema,
     FullUserInfoSchema,
     LoginSerializer,
     RegistrationSerializer,
@@ -30,8 +33,11 @@ from services.jwt_service import (
     generate_token_pair,
     set_token_cookies,
 )
+from services.s3_service import s3_client
 from services.user_service import (
+    check_permission_for_resume,
     create_profile_if_not_exist,
+    get_profile_if_exists,
     login_user,
     register_new_user,
 )
@@ -149,16 +155,56 @@ async def refresh(
 
 @router.post("/profile", response_model=UserProfileDBSchema)
 async def create_profile(
-    payload: CreateUserProfileSchema,
+    resume_file: UploadFile,
     session: AsyncSessionDependency,
-    current_user: FullUserFromAccessDependency,
+    access_token_payload: AccessTokenPayloadDependency,
+    context: str = Form(...),
 ) -> UserProfileDBSchema:
+    file_bytes = await resume_file.read()
+
     new_profile = await create_profile_if_not_exist(
         session=session,
-        current_user=current_user,
-        profile_info=payload,
+        user_id=access_token_payload.subject,
+        file_bytes=file_bytes,
+        context=context,
     )
-    new_profile_dto = UserProfileDBSchema.model_validate(
-        new_profile, from_attributes=True
+    await s3_client.put_resume_pdf(
+        data=file_bytes, object_name=new_profile.resume_file_path
     )
-    return new_profile_dto
+
+    await session.commit()
+    return UserProfileDBSchema.model_validate(new_profile, from_attributes=True)
+
+
+@router.get("/profile", response_model=UserProfileDBSchema)
+async def get_profile(
+    session: AsyncSessionDependency,
+    access_token_payload: AccessTokenPayloadDependency,
+) -> UserProfileDBSchema:
+    profile = await get_profile_if_exists(
+        session=session, user_id=access_token_payload.subject
+    )
+    return UserProfileDBSchema.model_validate(profile, from_attributes=True)
+
+
+@router.get("/resume-file", response_class=StreamingResponse)
+async def get_file(
+    resume_file_path: str,
+    session: AsyncSessionDependency,
+    access_token_payload: AccessTokenPayloadDependency,
+) -> Response:
+    await check_permission_for_resume(
+        resume_file_path=resume_file_path,
+        is_admin=access_token_payload.is_admin,
+        user_id=access_token_payload.subject,
+        session=session,
+    )
+
+    file_bytes = await s3_client.get_resume_pdf(resume_file_path)
+    file_stream = io.BytesIO(file_bytes)
+
+    return StreamingResponse(
+        content=file_stream,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "inline; filename=resume.pdf"},
+    )

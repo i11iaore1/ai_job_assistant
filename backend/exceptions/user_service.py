@@ -33,6 +33,22 @@ class UserNotFound(BaseAppException):
         )
 
 
+class NoProfile(BaseAppException):
+    def __init__(self):
+        super().__init__(
+            message="User doesn't have a profile",
+            status_code=404,
+        )
+
+
+class NotResumeOwner(BaseAppException):
+    def __init__(self):
+        super().__init__(
+            message="User does not have permission for the resume",
+            status_code=403,
+        )
+
+
 class NotAdmin(BaseAppException):
     def __init__(self):
         super().__init__(

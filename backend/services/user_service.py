@@ -1,11 +1,20 @@
+from uuid import uuid4
+
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from exceptions.user_service import EmailConflict, ProfileConflict, WrongCredentials
+from exceptions.user_service import (
+    EmailConflict,
+    NoProfile,
+    NotResumeOwner,
+    ProfileConflict,
+    WrongCredentials,
+)
 from sa.models.users import UserModel, UserProfileModel
 from sa.operations.users import (
     create_user,
     create_user_profile,
+    get_profile_by_user_id,
     get_user_by_email,
 )
 from serializers.users import (
@@ -14,6 +23,7 @@ from serializers.users import (
     LoginSerializer,
     RegistrationSerializer,
 )
+from utils.pdf_processing import get_pdf_text_from_stream
 
 
 async def register_new_user(
@@ -45,15 +55,47 @@ async def login_user(session: AsyncSession, payload: LoginSerializer) -> UserMod
 
 async def create_profile_if_not_exist(
     session: AsyncSession,
-    current_user: UserModel,
-    profile_info: CreateUserProfileSchema,
+    user_id: int,
+    file_bytes: bytes,
+    context: str,
 ) -> UserProfileModel:
-    if current_user.profile:
-        raise ProfileConflict()
+    object_name = f"{uuid4()}.pdf"
+    file_text = get_pdf_text_from_stream(file_bytes)
+
+    profile_info = CreateUserProfileSchema(
+        resume_file_path=object_name,
+        resume_text=file_text,
+        context=context,
+    )
+
     try:
         new_profile = await create_user_profile(
-            session=session, user_id=current_user.id, profile_info=profile_info
+            session=session,
+            user_id=user_id,
+            profile_info=profile_info,
         )
     except IntegrityError:
         raise ProfileConflict()
+
     return new_profile
+
+
+async def get_profile_if_exists(
+    session: AsyncSession, user_id: int
+) -> UserProfileModel:
+    profile = await get_profile_by_user_id(session=session, user_id=user_id)
+    if profile is None:
+        raise NoProfile()
+    return profile
+
+
+async def check_permission_for_resume(
+    resume_file_path: str,
+    is_admin: bool,
+    user_id: int,
+    session: AsyncSession,
+):
+    if not is_admin:
+        profile = await get_profile_by_user_id(session=session, user_id=user_id)
+        if profile is None or not profile.resume_file_path == resume_file_path:
+            raise NotResumeOwner()
