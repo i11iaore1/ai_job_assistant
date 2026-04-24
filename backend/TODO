@@ -1,6 +1,5 @@
 - CORS
 - readable API Documentation
-- pdf parsing for resume
-- S3-storage for resumes
+- S3-client head_object method
 - redis-caching for resume_text and context
 - Celery for cleaning expired refresh-tokens in postgres

@@ -1,6 +1,4 @@
-import io
-
-from fastapi import APIRouter, Form, Response, UploadFile
+from fastapi import APIRouter, Form, Response
 from fastapi.responses import StreamingResponse
 
 from dependencies.auth import (
@@ -10,6 +8,10 @@ from dependencies.auth import (
     RefreshTokenPayloadDependency,
     UserFromAccessDependency,
     UserFromRefreshDependency,
+)
+from dependencies.file_validation import (
+    OptionalResumeFileDependency,
+    ResumeFileDependency,
 )
 from exceptions.jwt_service import TokenReuse
 from sa.database import AsyncSessionDependency
@@ -40,6 +42,7 @@ from services.user_service import (
     get_profile_if_exists,
     login_user,
     register_new_user,
+    update_profile,
 )
 
 router = APIRouter()
@@ -94,12 +97,12 @@ async def update_user_account(
     current_user: UserFromAccessDependency,
     payload: UpdateUserSchema,
 ) -> UserDBSchema:
-    updated_user = await update_user(
+    await update_user(
         session=session,
         user=current_user,
         info_to_update=payload,
     )
-    return UserDBSchema.model_validate(updated_user, from_attributes=True)
+    return UserDBSchema.model_validate(current_user, from_attributes=True)
 
 
 @router.delete("/me")
@@ -155,9 +158,9 @@ async def refresh(
 
 @router.post("/profile", response_model=UserProfileDBSchema)
 async def create_profile(
-    resume_file: UploadFile,
     session: AsyncSessionDependency,
     access_token_payload: AccessTokenPayloadDependency,
+    resume_file: ResumeFileDependency,
     context: str = Form(...),
 ) -> UserProfileDBSchema:
     file_bytes = await resume_file.read()
@@ -200,11 +203,30 @@ async def get_file(
         session=session,
     )
 
-    file_bytes = await s3_client.get_resume_pdf(resume_file_path)
-    file_stream = io.BytesIO(file_bytes)
+    file_stream = s3_client.get_resume_pdf_stream(resume_file_path)
 
     return StreamingResponse(
         content=file_stream,
         media_type="application/pdf",
         headers={"Content-Disposition": "inline; filename=resume.pdf"},
+    )
+
+
+@router.patch("/profile", response_model=UserProfileDBSchema)
+async def update_user_profile(
+    session: AsyncSessionDependency,
+    current_user: FullUserFromAccessDependency,
+    resume_file: OptionalResumeFileDependency,
+    context: str | None = Form(None),
+) -> UserProfileDBSchema:
+    await update_profile(
+        session=session,
+        profile=current_user.profile,
+        resume_file=resume_file,
+        context=context,
+    )
+
+    await session.commit()
+    return UserProfileDBSchema.model_validate(
+        current_user.profile, from_attributes=True
     )

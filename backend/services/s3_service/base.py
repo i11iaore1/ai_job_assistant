@@ -1,7 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 from functools import wraps
-from typing import Any, AsyncGenerator, Callable, Coroutine
+from typing import Any, AsyncGenerator, BinaryIO, Callable, Coroutine
 
 from aiobotocore.session import get_session
 from botocore.config import Config
@@ -21,6 +21,24 @@ class AIOBotocoreConfig(BaseModel):
     endpoint_url: str
     aws_access_key_id: str
     aws_secret_access_key: str
+
+
+CHUNK_SIZE = 1024 * 1024
+
+
+def _parse_s3_exception(e: Exception) -> Exception:
+    if isinstance(e, ClientError):
+        error_code = e.response["Error"]["Code"]  # type: ignore
+        match error_code:
+            case "NoSuchBucket":
+                return NoSuchBucket()
+            case "NoSuchKey":
+                return NoSuchResume()
+            case _:
+                return StorageError()
+    if isinstance(e, (BotoCoreError, asyncio.TimeoutError)):
+        return StorageUnavailable()
+    return e
 
 
 class AppS3Client:
@@ -44,27 +62,30 @@ class AppS3Client:
             yield client
 
     @staticmethod
-    def handle_s3_errors(func: Callable[..., Coroutine[Any, Any, Any]]):
+    def _handle_s3_exceptions[T, **P](func: Callable[..., Coroutine[Any, Any, T]]):
         @wraps(func)
-        async def wrapper(*args, **kwargs):
+        async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             try:
                 return await func(*args, **kwargs)
-            except ClientError as e:
-                error_code = e.response["Error"]["Code"]  # type: ignore
-                match error_code:
-                    case "NoSuchBucket":
-                        raise NoSuchBucket()
-                    case "NoSuchKey":
-                        raise NoSuchResume()
-                    case _:
-                        raise StorageError()
-            except (BotoCoreError, asyncio.TimeoutError):
-                raise StorageUnavailable()
+            except Exception as e:
+                raise _parse_s3_exception(e)
 
         return wrapper
 
-    @handle_s3_errors
-    async def put_resume_pdf(self, data: bytes, object_name: str) -> None:
+    @staticmethod
+    def _handle_s3_stream_exceptions(func: Callable[..., AsyncGenerator[bytes, None]]):
+        @wraps(func)
+        async def wrapper(self, *args, **kwargs):
+            try:
+                async for chunk in func(self, *args, **kwargs):
+                    yield chunk
+            except Exception as e:
+                raise _parse_s3_exception(e)
+
+        return wrapper
+
+    @_handle_s3_exceptions
+    async def put_resume_pdf(self, data: bytes | BinaryIO, object_name: str) -> None:
         async with self.get_client() as client:
             await client.put_object(
                 Bucket=self.bucket_name,
@@ -73,7 +94,7 @@ class AppS3Client:
                 ContentType="application/pdf",
             )
 
-    @handle_s3_errors
+    @_handle_s3_exceptions
     async def get_resume_pdf(self, object_name: str) -> bytes:
         async with self.get_client() as client:
             response = await client.get_object(
@@ -83,7 +104,18 @@ class AppS3Client:
             async with response["Body"] as stream:
                 return await stream.read()
 
-    @handle_s3_errors
+    @_handle_s3_stream_exceptions
+    async def get_resume_pdf_stream(
+        self, object_name: str
+    ) -> AsyncGenerator[bytes, None]:
+        async with self.get_client() as client:
+            response = await client.get_object(Bucket=self.bucket_name, Key=object_name)
+
+            async with response["Body"] as stream:
+                async for chunk in stream.content.iter_chunked(CHUNK_SIZE):
+                    yield chunk
+
+    @_handle_s3_exceptions
     async def delete_resume_pdf(self, object_name: str) -> None:
         async with self.get_client() as client:
             await client.delete_object(

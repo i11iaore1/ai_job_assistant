@@ -19,7 +19,7 @@ class CreateUserSchema(BaseModel):
 class UpdateUserSchema(BaseModel):
     """DTO for updating a user DB record"""
 
-    username: str | None
+    username: str | None = None
 
 
 class UserDBSchema(BaseDatedSerializer):
@@ -37,6 +37,14 @@ class CreateUserProfileSchema(BaseModel):
     resume_file_path: str
     resume_text: str
     context: str
+
+
+class UpdateUserProfileSchema(BaseModel):
+    """DTO for updating a user profile DB record"""
+
+    resume_file_path: str | None = None
+    resume_text: str | None = None
+    context: str | None = None
 
 
 class UserProfileDBSchema(CreateUserProfileSchema, BaseDatedSerializer):
