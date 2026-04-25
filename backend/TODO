@@ -1,5 +1,4 @@
 - CORS
 - readable API Documentation
-- S3-client head_object method
 - redis-caching for resume_text and context
 - Celery for cleaning expired refresh-tokens in postgres

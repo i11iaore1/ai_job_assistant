@@ -1,10 +1,10 @@
 from exceptions.base import BaseAppException
 
 
-class NoSuchResume(BaseAppException):
+class NoSuchFile(BaseAppException):
     def __init__(self):
         super().__init__(
-            message="Resume was not found",
+            message="File was not found",
             status_code=404,
         )
 

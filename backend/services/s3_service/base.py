@@ -6,24 +6,15 @@ from typing import Any, AsyncGenerator, BinaryIO, Callable, Coroutine
 from aiobotocore.session import get_session
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
-from pydantic import BaseModel
 from types_aiobotocore_s3.client import S3Client
 
 from exceptions.s3_service import (
     NoSuchBucket,
-    NoSuchResume,
+    NoSuchFile,
     StorageError,
     StorageUnavailable,
 )
-
-
-class AIOBotocoreConfig(BaseModel):
-    endpoint_url: str
-    aws_access_key_id: str
-    aws_secret_access_key: str
-
-
-CHUNK_SIZE = 1024 * 1024
+from services.s3_service.models import AIOBotocoreConfig, FileMetadata
 
 
 def _parse_s3_exception(e: Exception) -> Exception:
@@ -33,7 +24,7 @@ def _parse_s3_exception(e: Exception) -> Exception:
             case "NoSuchBucket":
                 return NoSuchBucket()
             case "NoSuchKey":
-                return NoSuchResume()
+                return NoSuchFile()
             case _:
                 return StorageError()
     if isinstance(e, (BotoCoreError, asyncio.TimeoutError)):
@@ -46,6 +37,7 @@ class AppS3Client:
         self,
         config_model: AIOBotocoreConfig,
         bucket_name: str,
+        stream_chunk_size: int,
     ) -> None:
         self.client_kwargs = {
             **config_model.model_dump(),
@@ -54,6 +46,7 @@ class AppS3Client:
             ),
         }
         self.bucket_name = bucket_name
+        self.stream_chunk_size = stream_chunk_size
         self.session = get_session()
 
     @asynccontextmanager
@@ -85,17 +78,36 @@ class AppS3Client:
         return wrapper
 
     @_handle_s3_exceptions
-    async def put_resume_pdf(self, data: bytes | BinaryIO, object_name: str) -> None:
+    async def put_file(
+        self,
+        data: bytes | BinaryIO,
+        object_name: str,
+        content_type: str = "application/pdf",
+    ) -> None:
         async with self.get_client() as client:
             await client.put_object(
                 Bucket=self.bucket_name,
                 Key=object_name,
                 Body=data,
-                ContentType="application/pdf",
+                ContentType=content_type,
             )
 
     @_handle_s3_exceptions
-    async def get_resume_pdf(self, object_name: str) -> bytes:
+    async def get_file_metadata(self, object_name: str) -> FileMetadata:
+        async with self.get_client() as client:
+            response = await client.head_object(
+                Bucket=self.bucket_name,
+                Key=object_name,
+            )
+            metadata = FileMetadata(
+                content_length=response.get("ContentLength"),
+                content_type=response.get("ContentType"),
+                last_modified=response.get("LastModified"),
+            )
+            return metadata
+
+    @_handle_s3_exceptions
+    async def get_file(self, object_name: str) -> bytes:
         async with self.get_client() as client:
             response = await client.get_object(
                 Bucket=self.bucket_name,
@@ -105,18 +117,16 @@ class AppS3Client:
                 return await stream.read()
 
     @_handle_s3_stream_exceptions
-    async def get_resume_pdf_stream(
-        self, object_name: str
-    ) -> AsyncGenerator[bytes, None]:
+    async def get_file_stream(self, object_name: str) -> AsyncGenerator[bytes, None]:
         async with self.get_client() as client:
             response = await client.get_object(Bucket=self.bucket_name, Key=object_name)
 
             async with response["Body"] as stream:
-                async for chunk in stream.content.iter_chunked(CHUNK_SIZE):
+                async for chunk in stream.content.iter_chunked(self.stream_chunk_size):
                     yield chunk
 
     @_handle_s3_exceptions
-    async def delete_resume_pdf(self, object_name: str) -> None:
+    async def delete_file(self, object_name: str) -> None:
         async with self.get_client() as client:
             await client.delete_object(
                 Bucket=self.bucket_name,

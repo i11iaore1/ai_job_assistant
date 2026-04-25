@@ -1,3 +1,4 @@
+from typing import AsyncGenerator, NamedTuple
 from uuid import uuid4
 
 from fastapi import UploadFile
@@ -27,6 +28,7 @@ from serializers.users import (
     UpdateUserProfileSchema,
 )
 from services.s3_service import s3_client
+from services.s3_service.models import FileMetadata
 from utils.pdf_processing import get_pdf_text_from_stream
 
 
@@ -93,16 +95,26 @@ async def get_profile_if_exists(
     return profile
 
 
-async def check_permission_for_resume(
+class FileWithMetaData(NamedTuple):
+    stream: AsyncGenerator[bytes, None]
+    metadata: FileMetadata
+
+
+async def get_resume_file(
     resume_file_path: str,
     is_admin: bool,
     user_id: int,
     session: AsyncSession,
-):
+) -> FileWithMetaData:
     if not is_admin:
         profile = await get_profile_by_user_id(session=session, user_id=user_id)
         if profile is None or not profile.resume_file_path == resume_file_path:
             raise NotResumeOwner()
+
+    return FileWithMetaData(
+        stream=s3_client.get_file_stream(resume_file_path),
+        metadata=await s3_client.get_file_metadata(resume_file_path),
+    )
 
 
 async def update_profile(
@@ -136,8 +148,6 @@ async def update_profile(
     )
 
     if resume_file:
-        await s3_client.put_resume_pdf(
-            data=file_bytes, object_name=profile.resume_file_path
-        )
+        await s3_client.put_file(data=file_bytes, object_name=profile.resume_file_path)
 
-        await s3_client.delete_resume_pdf(current_object_name)
+        await s3_client.delete_file(current_object_name)

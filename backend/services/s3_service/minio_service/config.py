@@ -1,7 +1,7 @@
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from services.s3_service.base import AIOBotocoreConfig
+from services.s3_service.models import AIOBotocoreConfig
 
 
 class MinioConfig(BaseSettings):
@@ -10,8 +10,16 @@ class MinioConfig(BaseSettings):
     host: str = Field(validation_alias="MINIO_HOST")
     port: int = Field(validation_alias="MINIO_API_PORT")
     bucket: str = Field(validation_alias="MINIO_BUCKET")
+    stream_chunk_size_kb: int = Field(
+        validation_alias="MINIO_CHUNK_SIZE_KB",
+        default=1024,
+    )
 
     model_config = SettingsConfigDict(extra="ignore")
+
+    @property
+    def stream_chunk_size(self) -> int:
+        return self.stream_chunk_size_kb * 1024
 
     @property
     def aiobotocore_config(self) -> AIOBotocoreConfig:

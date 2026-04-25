@@ -37,9 +37,9 @@ from services.jwt_service import (
 )
 from services.s3_service import s3_client
 from services.user_service import (
-    check_permission_for_resume,
     create_profile_if_not_exist,
     get_profile_if_exists,
+    get_resume_file,
     login_user,
     register_new_user,
     update_profile,
@@ -171,9 +171,7 @@ async def create_profile(
         file_bytes=file_bytes,
         context=context,
     )
-    await s3_client.put_resume_pdf(
-        data=file_bytes, object_name=new_profile.resume_file_path
-    )
+    await s3_client.put_file(data=file_bytes, object_name=new_profile.resume_file_path)
 
     await session.commit()
     return UserProfileDBSchema.model_validate(new_profile, from_attributes=True)
@@ -196,19 +194,20 @@ async def get_file(
     session: AsyncSessionDependency,
     access_token_payload: AccessTokenPayloadDependency,
 ) -> Response:
-    await check_permission_for_resume(
+    file_stream, metadata = await get_resume_file(
         resume_file_path=resume_file_path,
         is_admin=access_token_payload.is_admin,
         user_id=access_token_payload.subject,
         session=session,
     )
 
-    file_stream = s3_client.get_resume_pdf_stream(resume_file_path)
-
     return StreamingResponse(
         content=file_stream,
-        media_type="application/pdf",
-        headers={"Content-Disposition": "inline; filename=resume.pdf"},
+        media_type=metadata.content_type,
+        headers={
+            "Content-Disposition": "inline; filename=resume.pdf",
+            "Content-Length": str(metadata.content_length),
+        },
     )
 
 
