@@ -17,7 +17,7 @@ from exceptions.s3_service import (
 from services.s3_service.models import AIOBotocoreConfig, FileMetadata
 
 
-def _parse_s3_exception(e: Exception) -> Exception:
+def _map_s3_exception(e: Exception) -> Exception:
     if isinstance(e, ClientError):
         error_code = e.response["Error"]["Code"]  # type: ignore
         match error_code:
@@ -61,7 +61,7 @@ class AppS3Client:
             try:
                 return await func(*args, **kwargs)
             except Exception as e:
-                raise _parse_s3_exception(e)
+                raise _map_s3_exception(e)
 
         return wrapper
 
@@ -73,7 +73,7 @@ class AppS3Client:
                 async for chunk in func(self, *args, **kwargs):
                     yield chunk
             except Exception as e:
-                raise _parse_s3_exception(e)
+                raise _map_s3_exception(e)
 
         return wrapper
 
