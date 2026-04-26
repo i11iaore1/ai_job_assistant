@@ -37,7 +37,8 @@ class ReviewDBSchema(ReviewSchema, BaseDatedSerializer):
 class ReviewVacancySerializer(BaseModel):
     """validates review vacancy request payload"""
 
-    vacancy_description: str
+    raw_description: str
+    comment: str
 
 
 class ReviewVacancyResponseSerializer(ReviewRequestDBSchema):

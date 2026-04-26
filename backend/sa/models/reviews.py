@@ -47,6 +47,12 @@ class ReviewRequestModel(Base, TimestampMixin):
         "ReviewModel", back_populates="request", uselist=False
     )
 
+    def fail(self):
+        self.status = ReviewRequestStatus.FAILED
+
+    def complete(self):
+        self.status = ReviewRequestStatus.COMPLETED
+
 
 class ReviewModel(Base, TimestampMixin):
     __tablename__ = "reviews"
