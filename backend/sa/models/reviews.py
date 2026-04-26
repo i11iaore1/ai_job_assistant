@@ -54,8 +54,8 @@ class ReviewModel(Base, TimestampMixin):
     request_id: Mapped[int] = mapped_column(
         ForeignKey("review_requests.id", ondelete="CASCADE"), primary_key=True
     )
-    position: Mapped[str]
-    company_name: Mapped[str]
+    position: Mapped[str | None]
+    company_name: Mapped[str | None]
     advantages: Mapped[jsonb_list]
     disadvantages: Mapped[jsonb_list]
     questions: Mapped[jsonb_list]
