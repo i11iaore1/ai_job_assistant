@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from sa.models.reviews import ReviewRequestStatus
 from serializers.base_serializer import BaseDatedSerializer
@@ -41,7 +41,9 @@ class ReviewVacancySerializer(BaseModel):
     comment: str
 
 
-class ReviewVacancyResponseSerializer(ReviewRequestDBSchema):
+class FullReviewRequestSchema(ReviewRequestDBSchema):
     """describes review vacancy response payload structure"""
 
     review: ReviewDBSchema | None
+
+    model_config = ConfigDict(from_attributes=True)

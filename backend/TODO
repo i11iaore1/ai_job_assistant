@@ -1,3 +1,4 @@
+- add filters for review-list endpoint
 - retry + limit for llm service
 - index on status column, all JSONB-columns, ...
 - CORS

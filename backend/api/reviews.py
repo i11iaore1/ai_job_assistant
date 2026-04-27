@@ -1,12 +1,13 @@
 from fastapi import APIRouter, BackgroundTasks, Request
+from fastapi_pagination import Page
 from sse_starlette import EventSourceResponse
 
 from dependencies.auth import FullUserFromAccessDependency, UserFromAccessDependency
+from dependencies.pagination import PaginationParams
 from sa.database import AsyncSessionDependency
-from sa.operations.reviews import (
-    create_review_request,
-)
+from sa.operations.reviews import create_review_request, get_review_requests
 from serializers.reviews import (
+    FullReviewRequestSchema,
     ReviewRequestDBSchema,
     ReviewVacancySerializer,
 )
@@ -40,6 +41,19 @@ async def request_vacancy_review(
 
     return ReviewRequestDBSchema.model_validate(
         new_review_request, from_attributes=True
+    )
+
+
+@router.get("/review-request", response_model=Page[FullReviewRequestSchema])
+async def list_review_requests(
+    session: AsyncSessionDependency,
+    current_user: UserFromAccessDependency,
+    pagination_params: PaginationParams,
+):
+    return await get_review_requests(
+        session=session,
+        user_id=current_user.id,
+        params=pagination_params,
     )
 
 
