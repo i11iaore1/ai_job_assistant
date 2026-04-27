@@ -2,15 +2,14 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi_pagination import add_pagination
 
-from api import reviews, users
+from api import router
 from exceptions.base import BaseAppException
 from exceptions.jwt_service import TokenReuse
 from services.jwt_service import delete_token_cookies
 
 app = FastAPI()
 
-app.include_router(users.router, tags=["Users"])
-app.include_router(reviews.router, tags=["Reviews"])
+app.include_router(router)
 
 add_pagination(app)
 
