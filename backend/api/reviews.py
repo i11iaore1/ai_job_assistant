@@ -16,13 +16,13 @@ from services.review_service import evaluate_in_the_background, review_event_gen
 router = APIRouter()
 
 
-@router.post("/review-request")
+@router.post("/review-request", response_model=ReviewRequestDBSchema)
 async def request_vacancy_review(
     session: AsyncSessionDependency,
     payload: ReviewVacancySerializer,
     current_user: FullUserFromAccessDependency,
     background_tasks: BackgroundTasks,
-) -> ReviewRequestDBSchema:
+):
     new_review_request = await create_review_request(
         session=session,
         user_id=current_user.id,
@@ -39,9 +39,7 @@ async def request_vacancy_review(
         review_request=new_review_request,
     )
 
-    return ReviewRequestDBSchema.model_validate(
-        new_review_request, from_attributes=True
-    )
+    return new_review_request
 
 
 @router.get("/review-request", response_model=Page[FullReviewRequestSchema])

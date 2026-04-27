@@ -14,6 +14,8 @@ class ReviewRequestDBSchema(BaseDatedSerializer):
     comment: str
     status: ReviewRequestStatus
 
+    model_config = ConfigDict(from_attributes=True)
+
 
 class ReviewSchema(BaseModel):
     """DTO for review"""
@@ -28,7 +30,7 @@ class ReviewSchema(BaseModel):
 class ReviewDBSchema(ReviewSchema, BaseDatedSerializer):
     """DTO for review  DB record"""
 
-    pass
+    model_config = ConfigDict(from_attributes=True)
 
 
 # review_vacancy

@@ -21,6 +21,7 @@ from sa.operations.users import (
     delete_user,
     update_user,
 )
+from serializers.response import StatusResponse
 from serializers.users import (
     FullUserInfoSchema,
     LoginSerializer,
@@ -53,9 +54,9 @@ async def register(
     payload: RegistrationSerializer,
     session: AsyncSessionDependency,
     response: Response,
-) -> UserDBSchema:
+):
     new_user = await register_new_user(session=session, user_input=payload)
-    new_user_dto = UserDBSchema.model_validate(new_user, from_attributes=True)
+    new_user_dto = UserDBSchema.model_validate(new_user)
     token_pair = await generate_token_pair(
         session=session,
         user=new_user_dto,
@@ -71,9 +72,9 @@ async def login(
     payload: LoginSerializer,
     session: AsyncSessionDependency,
     response: Response,
-) -> FullUserInfoSchema:
+):
     user = await login_user(session=session, payload=payload)
-    user_dto = FullUserInfoSchema.model_validate(user, from_attributes=True)
+    user_dto = FullUserInfoSchema.model_validate(user)
     token_pair = await generate_token_pair(
         session=session,
         user=user_dto,
@@ -84,36 +85,33 @@ async def login(
     return user_dto
 
 
-@router.get("/me")
-def get_full_user_info(
-    current_user: FullUserFromAccessDependency,
-) -> FullUserInfoSchema:
-    return FullUserInfoSchema.model_validate(current_user, from_attributes=True)
+@router.get("/me", response_model=FullUserInfoSchema)
+def get_full_user_info(current_user: FullUserFromAccessDependency):
+    return current_user
 
 
-@router.patch("/me")
+@router.patch("/me", response_model=UserDBSchema)
 async def update_user_account(
     session: AsyncSessionDependency,
     current_user: UserFromAccessDependency,
     payload: UpdateUserSchema,
-) -> UserDBSchema:
+):
     await update_user(
         session=session,
         user=current_user,
         info_to_update=payload,
     )
-    return UserDBSchema.model_validate(current_user, from_attributes=True)
+    return current_user
 
 
-@router.delete("/me")
+@router.delete("/me", status_code=204)
 async def delete_user_account(
     session: AsyncSessionDependency,
     current_user: UserFromAccessDependency,
-    response: Response,
 ):
     await delete_user(session=session, user=current_user)
     await session.commit()
-    response.status_code = 204
+    return None
 
 
 @router.post("/auth/logout")
@@ -126,7 +124,7 @@ async def logout(
         await delete_refresh_token(session=session, token_id=refresh_id)
         await session.commit()
     delete_token_cookies(response)
-    return {"message": "Logged out"}
+    return StatusResponse(message="Logged out")
 
 
 @router.post("/auth/refresh")
@@ -145,7 +143,7 @@ async def refresh(
         await delete_all_user_refresh_tokens(session=session, user_id=current_user.id)
         await session.commit()
         raise
-    user_dto = UserDBSchema.model_validate(current_user, from_attributes=True)
+    user_dto = UserDBSchema.model_validate(current_user)
     token_pair = await generate_token_pair(
         session=session,
         user=user_dto,
@@ -153,7 +151,7 @@ async def refresh(
     )
     await session.commit()
     set_token_cookies(token_pair=token_pair, response=response)
-    return {"message": "Refreshed"}
+    return StatusResponse(message="Refreshed")
 
 
 @router.post("/profile", response_model=UserProfileDBSchema)
@@ -162,7 +160,7 @@ async def create_profile(
     access_token_payload: AccessTokenPayloadDependency,
     resume_file: ResumeFileDependency,
     context: str = Form(...),
-) -> UserProfileDBSchema:
+):
     file_bytes = await resume_file.read()
 
     new_profile = await create_profile_if_not_exist(
@@ -174,18 +172,18 @@ async def create_profile(
     await s3_client.put_file(data=file_bytes, object_name=new_profile.resume_file_path)
 
     await session.commit()
-    return UserProfileDBSchema.model_validate(new_profile, from_attributes=True)
+    return new_profile
 
 
 @router.get("/profile", response_model=UserProfileDBSchema)
 async def get_profile(
     session: AsyncSessionDependency,
     access_token_payload: AccessTokenPayloadDependency,
-) -> UserProfileDBSchema:
+):
     profile = await get_profile_if_exists(
         session=session, user_id=access_token_payload.subject
     )
-    return UserProfileDBSchema.model_validate(profile, from_attributes=True)
+    return profile
 
 
 @router.get("/resume-file", response_class=StreamingResponse)
@@ -193,7 +191,7 @@ async def get_file(
     resume_file_path: str,
     session: AsyncSessionDependency,
     access_token_payload: AccessTokenPayloadDependency,
-) -> Response:
+):
     file_stream, metadata = await get_resume_file(
         resume_file_path=resume_file_path,
         is_admin=access_token_payload.is_admin,
@@ -217,7 +215,7 @@ async def update_user_profile(
     current_user: FullUserFromAccessDependency,
     resume_file: OptionalResumeFileDependency,
     context: str | None = Form(None),
-) -> UserProfileDBSchema:
+):
     await update_profile(
         session=session,
         profile=current_user.profile,
@@ -226,6 +224,4 @@ async def update_user_profile(
     )
 
     await session.commit()
-    return UserProfileDBSchema.model_validate(
-        current_user.profile, from_attributes=True
-    )
+    return current_user.profile

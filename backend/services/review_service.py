@@ -44,9 +44,7 @@ async def review_event_generator(
 
         match review_request.status:
             case ReviewRequestStatus.COMPLETED:
-                review = ReviewDBSchema.model_validate(
-                    review_request.review, from_attributes=True
-                )
+                review = ReviewDBSchema.model_validate(review_request.review)
 
                 yield ReviewJSONServerSentEvent(
                     data={

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import UUID4, BaseModel, EmailStr
+from pydantic import UUID4, BaseModel, ConfigDict, EmailStr
 
 from serializers.base_serializer import BaseDatedSerializer
 
@@ -30,6 +30,8 @@ class UserDBSchema(BaseDatedSerializer):
     username: str
     is_admin: bool
 
+    model_config = ConfigDict(from_attributes=True)
+
 
 class CreateUserProfileSchema(BaseModel):
     """DTO for creating a user profile DB record"""
@@ -50,7 +52,7 @@ class UpdateUserProfileSchema(BaseModel):
 class UserProfileDBSchema(CreateUserProfileSchema, BaseDatedSerializer):
     """DTO for user profile DB record"""
 
-    pass
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FullUserInfoSchema(UserDBSchema):
@@ -58,6 +60,8 @@ class FullUserInfoSchema(UserDBSchema):
 
     # user might not have a profile yet
     profile: UserProfileDBSchema | None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserCredentialsSchema(BaseModel):
