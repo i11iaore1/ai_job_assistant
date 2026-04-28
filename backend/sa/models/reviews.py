@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING, Annotated
 
-from sqlalchemy import JSON, ForeignKey, Index, Text
+from sqlalchemy import JSON, ForeignKey, Index, Text, text
 from sqlalchemy import Enum as SA_Enum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -30,7 +30,9 @@ class ReviewRequestModel(Base, TimestampMixin):
     __tablename__ = "review_requests"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
     raw_description: Mapped[str] = mapped_column(Text)
     comment: Mapped[str] = mapped_column(Text)
     status: Mapped[ReviewRequestStatus] = mapped_column(
@@ -57,9 +59,21 @@ class ReviewRequestModel(Base, TimestampMixin):
 class ReviewModel(Base, TimestampMixin):
     __tablename__ = "reviews"
     __table_args__ = (
-        Index("ix_reviews_advantages_gin", "advantages", postgresql_using="gin"),
-        Index("ix_reviews_disadvantages_gin", "disadvantages", postgresql_using="gin"),
-        Index("ix_reviews_questions_gin", "questions", postgresql_using="gin"),
+        Index(
+            "ix_reviews_advantages_trgm",
+            text("(advantages::text) gin_trgm_ops"),
+            postgresql_using="gin",
+        ),
+        Index(
+            "ix_reviews_disadvantages_trgm",
+            text("(disadvantages::text) gin_trgm_ops"),
+            postgresql_using="gin",
+        ),
+        Index(
+            "ix_reviews_questions_trgm",
+            text("(questions::text) gin_trgm_ops"),
+            postgresql_using="gin",
+        ),
     )
 
     request_id: Mapped[int] = mapped_column(
