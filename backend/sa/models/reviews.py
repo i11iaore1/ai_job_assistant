@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING, Annotated
 
-from sqlalchemy import JSON, ForeignKey, Text
+from sqlalchemy import JSON, ForeignKey, Index, Text
 from sqlalchemy import Enum as SA_Enum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -56,6 +56,11 @@ class ReviewRequestModel(Base, TimestampMixin):
 
 class ReviewModel(Base, TimestampMixin):
     __tablename__ = "reviews"
+    __table_args__ = (
+        Index("ix_reviews_advantages_gin", "advantages", postgresql_using="gin"),
+        Index("ix_reviews_disadvantages_gin", "disadvantages", postgresql_using="gin"),
+        Index("ix_reviews_questions_gin", "questions", postgresql_using="gin"),
+    )
 
     request_id: Mapped[int] = mapped_column(
         ForeignKey("review_requests.id", ondelete="CASCADE"), primary_key=True

@@ -1,6 +1,6 @@
-- add filters for review-list endpoint
+- indexes
+- languages
 - retry + limit for llm service
-- index on status column, all JSONB-columns, ...
 - CORS
 - readable API Documentation
 - redis-caching for resume_text and context

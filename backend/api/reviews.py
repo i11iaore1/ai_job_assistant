@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Request
+from fastapi import APIRouter, BackgroundTasks, Query, Request
 from fastapi_pagination import Page
 from sse_starlette import EventSourceResponse
 
@@ -47,11 +47,13 @@ async def list_review_requests(
     session: AsyncSessionDependency,
     current_user: UserFromAccessDependency,
     pagination_params: PaginationParams,
+    search: str | None = Query(None),
 ):
     return await get_review_requests(
         session=session,
         user_id=current_user.id,
         params=pagination_params,
+        search=search,
     )
 
 
