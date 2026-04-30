@@ -66,14 +66,13 @@ async def review_event_generator(
 async def evaluate_in_the_background(
     session: AsyncSessionDependency,
     profile: UserProfileModel,
-    vacancy_description: str,
     review_request: ReviewRequestModel,
 ):
     try:
         result = await llm_client.evaluate_vacancy(
             resume_text=profile.resume_text,
             context=profile.context,
-            vacancy_description=vacancy_description,
+            vacancy_description=review_request.raw_description,
         )
     except Exception:
         review_request.fail()

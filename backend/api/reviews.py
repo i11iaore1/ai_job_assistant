@@ -35,7 +35,6 @@ async def request_vacancy_review(
         evaluate_in_the_background,
         session=session,
         profile=current_user.profile,
-        vacancy_description=payload.raw_description,
         review_request=new_review_request,
     )
 
