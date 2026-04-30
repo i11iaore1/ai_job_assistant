@@ -1,4 +1,4 @@
-- retry + limit for llm service
+- repository pattern
 - CORS
 - readable API Documentation
 - redis-caching for resume_text and context
