@@ -40,15 +40,14 @@ def get_review_completion_params(
     resume_text: str,
     context: str,
     vacancy_description: str,
+    language: str,
 ) -> dict[str, Any]:
     return {
         "model": MODEL,
         "messages": [
             {
                 "role": "system",
-                "content": review_preset.get_system_message_content(
-                    language="ukrainian"
-                ),
+                "content": review_preset.get_system_message_content(language=language),
             },
             {
                 "role": "user",

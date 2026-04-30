@@ -1,4 +1,4 @@
-from typing import Protocol
+from typing import Any, Protocol
 
 from services.llm_service.groq_service.schemas import ReviewSchema
 
@@ -9,6 +9,8 @@ class SyncLLMClient(Protocol):
         resume_text: str,
         context: str,
         vacancy_description: str,
+        *args: Any,
+        **kwargs: Any,
     ) -> ReviewSchema: ...
 
 
@@ -18,4 +20,6 @@ class AsyncLLMClient(Protocol):
         resume_text: str,
         context: str,
         vacancy_description: str,
+        *args: Any,
+        **kwargs: Any,
     ) -> ReviewSchema: ...

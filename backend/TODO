@@ -1,4 +1,3 @@
-- languages
 - retry + limit for llm service
 - CORS
 - readable API Documentation

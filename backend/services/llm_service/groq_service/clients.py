@@ -29,13 +29,18 @@ class SyncGroqClient(ProcessCompletionBase):
         self._client = Groq(api_key=api_key)
 
     def evaluate_vacancy(
-        self, resume_text: str, context: str, vacancy_description: str
+        self,
+        resume_text: str,
+        context: str,
+        vacancy_description: str,
+        language: str = "english",
     ) -> ReviewSchema:
         chat_completion: ChatCompletion = self._client.chat.completions.create(
             **get_review_completion_params(
                 resume_text=resume_text,
                 context=context,
                 vacancy_description=vacancy_description,
+                language=language,
             )
         )
         return self.process_completion(chat_completion)
@@ -46,13 +51,18 @@ class AsyncGroqClient(ProcessCompletionBase):
         self._client = AsyncGroq(api_key=api_key)
 
     async def evaluate_vacancy(
-        self, resume_text: str, context: str, vacancy_description: str
+        self,
+        resume_text: str,
+        context: str,
+        vacancy_description: str,
+        language: str = "english",
     ) -> ReviewSchema:
         chat_completion: ChatCompletion = await self._client.chat.completions.create(
             **get_review_completion_params(
                 resume_text=resume_text,
                 context=context,
                 vacancy_description=vacancy_description,
+                language=language,
             )
         )
         return self.process_completion(chat_completion)
