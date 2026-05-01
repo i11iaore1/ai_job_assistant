@@ -46,7 +46,12 @@ class ReviewRequestModel(Base, TimestampMixin):
     user: Mapped["UserModel"] = relationship("UserModel", back_populates="requests")
 
     review: Mapped["ReviewModel"] = relationship(
-        "ReviewModel", back_populates="request", uselist=False
+        "ReviewModel",
+        back_populates="request",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        single_parent=True,
     )
 
     def fail(self):

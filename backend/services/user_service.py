@@ -54,6 +54,12 @@ async def login_user(session: AsyncSession, payload: LoginSerializer) -> UserMod
     return user
 
 
+async def delete_user(user: UserModel, session: AsyncSession) -> None:
+    if user.profile is not None:
+        await s3_client.delete_file(user.profile.resume_file_path)
+    await user_repository.delete(instance=user, session=session)
+
+
 async def create_profile_if_not_exist(
     session: AsyncSession,
     user_id: int,
@@ -68,12 +74,14 @@ async def create_profile_if_not_exist(
         resume_text=file_text,
         context=context,
     )
+    data = {"user_id": user_id, **profile_info.model_dump()}
 
     try:
-        data = {"user_id": user_id, **profile_info.model_dump()}
         new_profile = await user_profile_repository.create(data=data, session=session)
     except IntegrityError:
         raise ProfileConflict()
+
+    await s3_client.put_file(data=file_bytes, object_name=object_name)
 
     return new_profile
 
@@ -111,10 +119,13 @@ async def get_resume_file(
 
 async def update_profile(
     session: AsyncSession,
-    profile: UserProfileModel,
+    profile: UserProfileModel | None,
     resume_file: UploadFile | None,
     context: str | None,
 ) -> None:
+    if profile is None:
+        raise NoProfile()
+
     info_to_update = UpdateUserProfileSchema()
 
     if context is not None:
@@ -145,3 +156,14 @@ async def update_profile(
         await s3_client.put_file(data=file_bytes, object_name=profile.resume_file_path)
 
         await s3_client.delete_file(current_object_name)
+
+
+async def delete_profile(
+    profile: UserProfileModel | None,
+    session: AsyncSession,
+) -> None:
+    if profile is None:
+        raise NoProfile()
+
+    await s3_client.delete_file(profile.resume_file_path)
+    await user_profile_repository.delete(instance=profile, session=session)

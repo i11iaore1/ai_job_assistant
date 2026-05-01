@@ -24,11 +24,28 @@ class UserModel(Base, TimestampMixin):
     is_admin: Mapped[bool]
 
     profile: Mapped["UserProfileModel"] = relationship(
-        "UserProfileModel", back_populates="user", uselist=False
+        "UserProfileModel",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        single_parent=True,
     )
 
     requests: Mapped[list["ReviewRequestModel"]] = relationship(
-        "ReviewRequestModel", back_populates="user"
+        "ReviewRequestModel",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        single_parent=True,
+    )
+
+    refresh_tokens: Mapped[list["RefreshTokenModel"]] = relationship(
+        "RefreshTokenModel",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        single_parent=True,
     )
 
     @property
@@ -51,6 +68,10 @@ class RefreshTokenModel(Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+    user: Mapped["UserModel"] = relationship(
+        "UserModel", back_populates="refresh_tokens"
+    )
 
 
 class UserProfileModel(Base, TimestampMixin):

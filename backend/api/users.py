@@ -35,9 +35,10 @@ from services.jwt_service import (
     generate_token_pair,
     set_token_cookies,
 )
-from services.s3_service import s3_client
 from services.user_service import (
     create_profile_if_not_exist,
+    delete_profile,
+    delete_user,
     get_profile_if_exists,
     get_resume_file,
     login_user,
@@ -105,11 +106,11 @@ async def update_user(
 
 
 @router.delete("/me", status_code=204)
-async def delete_user(
+async def delete_current_user(
     session: AsyncSessionDependency,
-    current_user: UserFromAccessDependency,
+    current_user: FullUserFromAccessDependency,
 ):
-    await user_repository.delete(instance=current_user, session=session)
+    await delete_user(user=current_user, session=session)
     await session.commit()
     return None
 
@@ -169,7 +170,6 @@ async def create_profile(
         file_bytes=file_bytes,
         context=context,
     )
-    await s3_client.put_file(data=file_bytes, object_name=new_profile.resume_file_path)
 
     await session.commit()
     return new_profile
@@ -225,3 +225,13 @@ async def update_user_profile(
 
     await session.commit()
     return current_user.profile
+
+
+@router.delete("/profile", status_code=204)
+async def delete_user_profile(
+    session: AsyncSessionDependency,
+    current_user: FullUserFromAccessDependency,
+):
+    await delete_profile(profile=current_user.profile, session=session)
+    await session.commit()
+    return None
