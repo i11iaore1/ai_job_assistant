@@ -15,12 +15,11 @@ from dependencies.file_validation import (
 )
 from exceptions.jwt_service import TokenReuse
 from sa.database import AsyncSessionDependency
-from sa.operations.users import (
+from sa.operations.refresh_tokens import (
     delete_all_user_refresh_tokens,
     delete_refresh_token,
-    delete_user,
-    update_user,
 )
+from sa.repositories import user_repository
 from serializers.response import StatusResponse
 from serializers.users import (
     FullUserInfoSchema,
@@ -91,25 +90,26 @@ def get_full_user_info(current_user: FullUserFromAccessDependency):
 
 
 @router.patch("/me", response_model=UserDBSchema)
-async def update_user_account(
+async def update_user(
     session: AsyncSessionDependency,
     current_user: UserFromAccessDependency,
     payload: UpdateUserSchema,
 ):
-    await update_user(
+    await user_repository.update(
+        instance=current_user,
+        data=payload.model_dump(),
         session=session,
-        user=current_user,
-        info_to_update=payload,
     )
+    await session.commit()
     return current_user
 
 
 @router.delete("/me", status_code=204)
-async def delete_user_account(
+async def delete_user(
     session: AsyncSessionDependency,
     current_user: UserFromAccessDependency,
 ):
-    await delete_user(session=session, user=current_user)
+    await user_repository.delete(instance=current_user, session=session)
     await session.commit()
     return None
 

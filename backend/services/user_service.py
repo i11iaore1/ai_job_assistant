@@ -13,13 +13,7 @@ from exceptions.user_service import (
     WrongCredentials,
 )
 from sa.models.users import UserModel, UserProfileModel
-from sa.operations.users import (
-    create_user,
-    create_user_profile,
-    get_profile_by_user_id,
-    get_user_by_email,
-    update_user_profile,
-)
+from sa.repositories import user_profile_repository, user_repository
 from serializers.users import (
     CreateUserProfileSchema,
     CreateUserSchema,
@@ -42,17 +36,18 @@ async def register_new_user(
         user_input = user_input.model_copy(update={"username": username})
     try:
         user_info = CreateUserSchema(**user_input.model_dump(), is_admin=is_admin)
-        new_user = await create_user(session=session, user_info=user_info)
+        new_user = await user_repository.create(
+            session=session, data=user_info.model_dump()
+        )
     except IntegrityError:
         raise EmailConflict()
     return new_user
 
 
 async def login_user(session: AsyncSession, payload: LoginSerializer) -> UserModel:
-    user = await get_user_by_email(
+    user = await user_repository.get_by_email_with_profile(
         session=session,
         email=payload.email,
-        with_profile=True,
     )
     if user is None or not user.verify_password(payload.password):
         raise WrongCredentials()
@@ -75,11 +70,8 @@ async def create_profile_if_not_exist(
     )
 
     try:
-        new_profile = await create_user_profile(
-            session=session,
-            user_id=user_id,
-            profile_info=profile_info,
-        )
+        data = {"user_id": user_id, **profile_info.model_dump()}
+        new_profile = await user_profile_repository.create(data=data, session=session)
     except IntegrityError:
         raise ProfileConflict()
 
@@ -89,7 +81,7 @@ async def create_profile_if_not_exist(
 async def get_profile_if_exists(
     session: AsyncSession, user_id: int
 ) -> UserProfileModel:
-    profile = await get_profile_by_user_id(session=session, user_id=user_id)
+    profile = await user_profile_repository.get_by_id(id=user_id, session=session)
     if profile is None:
         raise NoProfile()
     return profile
@@ -107,7 +99,7 @@ async def get_resume_file(
     session: AsyncSession,
 ) -> FileWithMetaData:
     if not is_admin:
-        profile = await get_profile_by_user_id(session=session, user_id=user_id)
+        profile = await user_profile_repository.get_by_id(id=user_id, session=session)
         if profile is None or not profile.resume_file_path == resume_file_path:
             raise NotResumeOwner()
 
@@ -141,10 +133,12 @@ async def update_profile(
     if not info_to_update.model_fields_set:
         return
 
-    await update_user_profile(
+    data = info_to_update.model_dump(exclude_unset=True)
+
+    await user_profile_repository.update(
+        instance=profile,
+        data=data,
         session=session,
-        profile=profile,
-        info_to_update=info_to_update,
     )
 
     if resume_file:

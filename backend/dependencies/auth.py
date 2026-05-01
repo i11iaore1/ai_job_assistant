@@ -1,10 +1,10 @@
-from typing import Annotated, Any
+from functools import wraps
+from typing import Annotated, Any, Awaitable, Callable
 from uuid import UUID
 
 from fastapi import Depends, Request
 from jwt import ExpiredSignatureError, PyJWTError
 from pydantic import ValidationError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from exceptions.jwt_service import (
     NotAuthenticated,
@@ -15,7 +15,7 @@ from exceptions.jwt_service import (
 from exceptions.user_service import UserNotFound
 from sa.database import AsyncSessionDependency
 from sa.models.users import UserModel
-from sa.operations.users import get_user_by_id
+from sa.repositories import user_repository
 from utils.jwt_service import jwt_decode
 from utils.security.auth import (
     AccessTokenPayloadSchema,
@@ -58,8 +58,12 @@ class TokenPayloadGetter[T: TokenPayloadSchema]:
         return token_payload_dto
 
 
-get_access_token_payload = TokenPayloadGetter(access_token_config)
-get_refresh_token_payload = TokenPayloadGetter(refresh_token_config)
+get_access_token_payload = TokenPayloadGetter[type[AccessTokenPayloadSchema]](
+    access_token_config
+)
+get_refresh_token_payload = TokenPayloadGetter[type[RefreshTokenPayloadSchema]](
+    refresh_token_config
+)
 
 AccessTokenPayloadDependency = Annotated[
     AccessTokenPayloadSchema, Depends(get_access_token_payload)
@@ -69,62 +73,60 @@ RefreshTokenPayloadDependency = Annotated[
 ]
 
 
-async def get_user_from_token_payload(
-    session: AsyncSession,
-    user_id: int,
-    with_profile: bool,
-) -> UserModel:
-    current_user = await get_user_by_id(
-        session=session,
-        user_id=user_id,
-        with_profile=with_profile,
-    )
-    if current_user is None:
-        raise UserNotFound()
-    return current_user
+def raise_not_found[**P](
+    user_getter: Callable[P, Awaitable[UserModel | None]],
+) -> Callable[P, Awaitable[UserModel]]:
+    @wraps(user_getter)
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> UserModel:
+        user = await user_getter(*args, **kwargs)
+        if user is None:
+            raise UserNotFound()
+        return user
+
+    return wrapper
 
 
+@raise_not_found
 async def get_user_from_access_token(
     session: AsyncSessionDependency,
     payload: AccessTokenPayloadDependency,
-) -> UserModel:
-    return await get_user_from_token_payload(
+) -> UserModel | None:
+    return await user_repository.get_by_id(
+        id=payload.subject,
         session=session,
-        user_id=payload.subject,
-        with_profile=False,
     )
 
 
+@raise_not_found
 async def get_user_with_profile_from_access_token(
     session: AsyncSessionDependency,
     payload: AccessTokenPayloadDependency,
-) -> UserModel:
-    return await get_user_from_token_payload(
+) -> UserModel | None:
+    return await user_repository.get_by_id_with_profile(
+        id=payload.subject,
         session=session,
-        user_id=payload.subject,
-        with_profile=True,
     )
 
 
+@raise_not_found
 async def get_user_from_refresh_token(
     session: AsyncSessionDependency,
     payload: RefreshTokenPayloadDependency,
-) -> UserModel:
-    return await get_user_from_token_payload(
+) -> UserModel | None:
+    return await user_repository.get_by_id(
+        id=payload.subject,
         session=session,
-        user_id=payload.subject,
-        with_profile=False,
     )
 
 
+@raise_not_found
 async def get_user_with_profile_from_refresh_token(
     session: AsyncSessionDependency,
     payload: RefreshTokenPayloadDependency,
-) -> UserModel:
-    return await get_user_from_token_payload(
+) -> UserModel | None:
+    return await user_repository.get_by_id_with_profile(
+        id=payload.subject,
         session=session,
-        user_id=payload.subject,
-        with_profile=True,
     )
 
 

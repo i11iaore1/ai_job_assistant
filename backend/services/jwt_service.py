@@ -5,7 +5,7 @@ from fastapi import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from exceptions.jwt_service import TokenReuse
-from sa.operations.users import (
+from sa.operations.refresh_tokens import (
     delete_refresh_token,
     record_refresh_token,
 )

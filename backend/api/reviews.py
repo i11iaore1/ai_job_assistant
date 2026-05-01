@@ -5,7 +5,7 @@ from sse_starlette import EventSourceResponse
 from dependencies.auth import FullUserFromAccessDependency, UserFromAccessDependency
 from dependencies.pagination import PaginationParams
 from sa.database import AsyncSessionDependency
-from sa.operations.reviews import create_review_request, get_review_requests
+from sa.repositories import review_request_repository
 from serializers.reviews import (
     FullReviewRequestSchema,
     ReviewRequestDBSchema,
@@ -23,10 +23,10 @@ async def request_vacancy_review(
     current_user: FullUserFromAccessDependency,
     background_tasks: BackgroundTasks,
 ):
-    new_review_request = await create_review_request(
-        session=session,
-        user_id=current_user.id,
-        request_info=payload,
+    data = {"user_id": current_user.id, **payload.model_dump()}
+
+    new_review_request = await review_request_repository.create(
+        session=session, data=data
     )
 
     await session.commit()
@@ -48,7 +48,7 @@ async def list_review_requests(
     pagination_params: PaginationParams,
     search: str | None = Query(None),
 ):
-    return await get_review_requests(
+    return await review_request_repository.get_list(
         session=session,
         user_id=current_user.id,
         params=pagination_params,

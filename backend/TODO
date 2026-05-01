@@ -1,4 +1,3 @@
-- repository pattern
 - readable API Documentation
 - redis-caching for resume_text and context
 - Celery for cleaning expired refresh-tokens in postgres

@@ -5,13 +5,9 @@ from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette import JSONServerSentEvent
 
-from sa.database import AsyncSessionDependency
 from sa.models.reviews import ReviewRequestModel, ReviewRequestStatus
 from sa.models.users import UserProfileModel
-from sa.operations.reviews import (
-    create_review,
-    get_review_request_by_id,
-)
+from sa.repositories import review_repository, review_request_repository
 from serializers.reviews import ReviewDBSchema
 from services.llm_service import llm_client
 
@@ -32,10 +28,10 @@ async def review_event_generator(
             break
 
         session.expire_all()
-        review_request = await get_review_request_by_id(
+
+        review_request = await review_request_repository.get_by_id_with_review(
+            id=review_request_id,
             session=session,
-            request_id=review_request_id,
-            with_review=True,
         )
 
         if review_request is None or review_request.user_id != user_id:
@@ -64,7 +60,7 @@ async def review_event_generator(
 
 
 async def evaluate_in_the_background(
-    session: AsyncSessionDependency,
+    session: AsyncSession,
     profile: UserProfileModel,
     review_request: ReviewRequestModel,
 ):
@@ -79,9 +75,9 @@ async def evaluate_in_the_background(
         await session.commit()
         raise
 
-    await create_review(
+    await review_repository.create(
         session=session,
         request=review_request,
-        review_info=result,
+        data=result.model_dump(),
     )
     await session.commit()
