@@ -5,11 +5,27 @@ from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette import JSONServerSentEvent
 
+from exceptions.review_service import ReviewNotFound
+from exceptions.user_service import NoProfile
+from sa.models import ReviewModel, UserModel
 from sa.models.reviews import ReviewRequestModel, ReviewRequestStatus
 from sa.models.users import UserProfileModel
 from sa.repositories import review_repository, review_request_repository
 from serializers.reviews import ReviewDBSchema
 from services.llm_service import llm_client
+
+
+async def create_review_request(
+    data: dict[str, Any],
+    user: UserModel,
+    session: AsyncSession,
+) -> ReviewRequestModel:
+    if user.profile is None:
+        raise NoProfile()
+
+    return await review_request_repository.create(
+        session=session, data={"user_id": user.id, **data}
+    )
 
 
 class ReviewJSONServerSentEvent(JSONServerSentEvent):
@@ -81,3 +97,43 @@ async def evaluate_in_the_background(
         data=result.model_dump(),
     )
     await session.commit()
+
+
+async def update_review_result(
+    review_request_id: int,
+    data_to_update: dict[str, Any],
+    user_id: int,
+    session: AsyncSession,
+) -> ReviewModel:
+    review_request = await review_request_repository.get_by_id_with_review(
+        id=review_request_id,
+        session=session,
+    )
+
+    if review_request is None or review_request.user_id != user_id:
+        raise ReviewNotFound()
+
+    return await review_repository.update(
+        instance=review_request.review,
+        data=data_to_update,
+        session=session,
+    )
+
+
+async def delete_review_request(
+    review_request_id: int,
+    user_id: int,
+    session: AsyncSession,
+) -> None:
+    review_request = await review_request_repository.get_by_id(
+        id=review_request_id,
+        session=session,
+    )
+
+    if review_request is None or review_request.user_id != user_id:
+        raise ReviewNotFound()
+
+    await review_request_repository.delete(
+        instance=review_request,
+        session=session,
+    )

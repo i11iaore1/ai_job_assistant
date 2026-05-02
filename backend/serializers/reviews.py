@@ -43,6 +43,16 @@ class ReviewVacancySerializer(BaseModel):
     comment: str
 
 
+class UpdateReviewSchema(BaseModel):
+    """DTO for updating a review DB record"""
+
+    position: str | None = None
+    company_name: str | None = None
+    advantages: list[str] = []
+    disadvantages: list[str] = []
+    questions: list[str] = []
+
+
 class FullReviewRequestSchema(ReviewRequestDBSchema):
     """describes review vacancy response payload structure"""
 

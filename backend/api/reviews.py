@@ -8,10 +8,18 @@ from sa.database import AsyncSessionDependency
 from sa.repositories import review_request_repository
 from serializers.reviews import (
     FullReviewRequestSchema,
+    ReviewDBSchema,
     ReviewRequestDBSchema,
     ReviewVacancySerializer,
+    UpdateReviewSchema,
 )
-from services.review_service import evaluate_in_the_background, review_event_generator
+from services.review_service import (
+    create_review_request,
+    delete_review_request,
+    evaluate_in_the_background,
+    review_event_generator,
+    update_review_result,
+)
 
 router = APIRouter()
 
@@ -23,10 +31,10 @@ async def request_vacancy_review(
     current_user: FullUserFromAccessDependency,
     background_tasks: BackgroundTasks,
 ):
-    data = {"user_id": current_user.id, **payload.model_dump()}
-
-    new_review_request = await review_request_repository.create(
-        session=session, data=data
+    new_review_request = await create_review_request(
+        data=payload.model_dump(),
+        user=current_user,
+        session=session,
     )
 
     await session.commit()
@@ -71,3 +79,35 @@ async def stream_review_status(
     )
 
     return EventSourceResponse(stream, ping=15)
+
+
+@router.patch("/review/{review_request_id}", response_model=ReviewDBSchema)
+async def update_review(
+    review_request_id: int,
+    payload: UpdateReviewSchema,
+    current_user: UserFromAccessDependency,
+    session: AsyncSessionDependency,
+):
+    review = await update_review_result(
+        review_request_id=review_request_id,
+        data_to_update=payload.model_dump(exclude_unset=True),
+        user_id=current_user.id,
+        session=session,
+    )
+    await session.commit()
+    return review
+
+
+@router.delete("/review/{review_request_id}", status_code=204)
+async def delete_review(
+    review_request_id: int,
+    current_user: UserFromAccessDependency,
+    session: AsyncSessionDependency,
+):
+    await delete_review_request(
+        review_request_id=review_request_id,
+        user_id=current_user.id,
+        session=session,
+    )
+    await session.commit()
+    return None
