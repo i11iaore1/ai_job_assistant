@@ -98,7 +98,7 @@ async def update_user(
 ):
     await user_repository.update(
         instance=current_user,
-        data=payload.model_dump(),
+        data=payload.model_dump(exclude_unset=True),
         session=session,
     )
     await session.commit()
