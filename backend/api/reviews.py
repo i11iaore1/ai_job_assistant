@@ -24,7 +24,7 @@ from services.review_service import (
 router = APIRouter()
 
 
-@router.post("/review-request", response_model=ReviewRequestDBSchema)
+@router.post("/review-requests", response_model=ReviewRequestDBSchema)
 async def request_vacancy_review(
     session: AsyncSessionDependency,
     payload: ReviewVacancySerializer,
@@ -49,7 +49,7 @@ async def request_vacancy_review(
     return new_review_request
 
 
-@router.get("/review-request", response_model=Page[FullReviewRequestSchema])
+@router.get("/review-requests", response_model=Page[FullReviewRequestSchema])
 async def list_review_requests(
     session: AsyncSessionDependency,
     current_user: UserFromAccessDependency,
@@ -64,7 +64,7 @@ async def list_review_requests(
     )
 
 
-@router.get("/review/{review_request_id}")
+@router.get("/reviews/{review_request_id}")
 async def stream_review_status(
     request: Request,
     current_user: UserFromAccessDependency,
@@ -81,7 +81,7 @@ async def stream_review_status(
     return EventSourceResponse(stream, ping=15)
 
 
-@router.patch("/review/{review_request_id}", response_model=ReviewDBSchema)
+@router.patch("/reviews/{review_request_id}", response_model=ReviewDBSchema)
 async def update_review(
     review_request_id: int,
     payload: UpdateReviewSchema,
@@ -98,7 +98,7 @@ async def update_review(
     return review
 
 
-@router.delete("/review/{review_request_id}", status_code=204)
+@router.delete("/reviews/{review_request_id}", status_code=204)
 async def delete_review(
     review_request_id: int,
     current_user: UserFromAccessDependency,
