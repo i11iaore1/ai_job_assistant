@@ -4,11 +4,16 @@ from fastapi.responses import JSONResponse
 from fastapi_pagination import add_pagination
 
 from api import router
+from config import app_config
 from exceptions.base import BaseAppException
 from exceptions.jwt_service import TokenReuse
 from services.jwt_service import delete_token_cookies
 
-app = FastAPI()
+app = FastAPI(
+    title="AI Job Assistant",
+    description="REST API for reviewing vacancy descriptions based on given resume and context",
+    version=app_config.app_version,
+)
 
 origins = [
     "http://localhost",
@@ -26,12 +31,9 @@ app.add_middleware(
 )
 
 
-app.include_router(router)
+app.include_router(router, prefix=f"/api/{app_config.app_version}")
 
 add_pagination(app)
-
-
-app.exception_handler(BaseAppException)
 
 
 @app.exception_handler(BaseAppException)

@@ -1,8 +1,9 @@
 from functools import wraps
-from typing import Annotated, Any, Awaitable, Callable
+from typing import Annotated, Awaitable, Callable
 from uuid import UUID
 
 from fastapi import Depends, Request
+from fastapi.security import APIKeyCookie
 from jwt import ExpiredSignatureError, PyJWTError
 from pydantic import ValidationError
 
@@ -27,49 +28,50 @@ from utils.security.auth import (
 )
 
 
-class TokenPayloadGetter[T: TokenPayloadSchema]:
-    def __init__(self, token_config: TokenConfig[T]):
-        self.token_config = token_config
-
-    def decode_token(self, token_str: str) -> dict[str, Any]:
+def token_payload_dependency_factory[T: TokenPayloadSchema](
+    token_config: TokenConfig[T],
+):
+    def extract_and_validate_payload(
+        request: Request,
+        _=Depends(
+            APIKeyCookie(
+                name=token_config.default_cookie_attrs.key,
+                scheme_name=f"{token_config.type_label.capitalize()} Cookie",
+                auto_error=False,
+            )
+        ),
+    ) -> T:
+        token_str = request.cookies.get(token_config.default_cookie_attrs.key)
+        if token_str is None:
+            raise NotAuthenticated()
         try:
-            payload_dict = jwt_decode(token_str)
+            raw_payload_dict = jwt_decode(token_str)
         except ExpiredSignatureError:
             raise TokenExpired()
         except PyJWTError:
             raise TokenInvalid()
-        return payload_dict
-
-    def __call__(self, request: Request) -> T:
-        token_str = request.cookies.get(self.token_config.default_cookie_attrs.key)
-        if token_str is None:
-            raise NotAuthenticated()
-        payload_dict = self.decode_token(token_str)
         try:
-            token_payload_dto = (
-                self.token_config.payload_validation_model.model_validate(payload_dict)
+            validated_payload = token_config.payload_validation_model.model_validate(
+                raw_payload_dict
             )
         except ValidationError:
             raise TokenInvalid()
 
-        if token_payload_dto.type != self.token_config.type_label:
+        if validated_payload.type != token_config.type_label:
             raise TokenTypeMismatch()
 
-        return token_payload_dto
+        return validated_payload
 
+    return extract_and_validate_payload
 
-get_access_token_payload = TokenPayloadGetter[type[AccessTokenPayloadSchema]](
-    access_token_config
-)
-get_refresh_token_payload = TokenPayloadGetter[type[RefreshTokenPayloadSchema]](
-    refresh_token_config
-)
 
 AccessTokenPayloadDependency = Annotated[
-    AccessTokenPayloadSchema, Depends(get_access_token_payload)
+    AccessTokenPayloadSchema,
+    Depends(token_payload_dependency_factory(access_token_config)),
 ]
 RefreshTokenPayloadDependency = Annotated[
-    RefreshTokenPayloadSchema, Depends(get_refresh_token_payload)
+    RefreshTokenPayloadSchema,
+    Depends(token_payload_dependency_factory(refresh_token_config)),
 ]
 
 

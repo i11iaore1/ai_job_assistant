@@ -49,7 +49,7 @@ from services.user_service import (
 router = APIRouter()
 
 
-@router.post("/register", response_model=UserDBSchema)
+@router.post("/register", response_model=UserDBSchema, status_code=201)
 async def register(
     payload: RegistrationSerializer,
     session: AsyncSessionDependency,
@@ -67,7 +67,7 @@ async def register(
     return new_user_dto
 
 
-@router.post("/login", response_model=FullUserInfoSchema)
+@router.post("/login", response_model=FullUserInfoSchema, status_code=200)
 async def login(
     payload: LoginSerializer,
     session: AsyncSessionDependency,
@@ -115,7 +115,7 @@ async def delete_current_user(
     return None
 
 
-@router.post("/auth/logout")
+@router.post("/auth/logout", status_code=200)
 async def logout(
     session: AsyncSessionDependency,
     refresh_id: RefreshIdDependency,
@@ -128,7 +128,7 @@ async def logout(
     return StatusResponse(message="Logged out")
 
 
-@router.post("/auth/refresh")
+@router.post("/auth/refresh", status_code=200)
 async def refresh(
     session: AsyncSessionDependency,
     refresh_payload: RefreshTokenPayloadDependency,
@@ -155,7 +155,7 @@ async def refresh(
     return StatusResponse(message="Refreshed")
 
 
-@router.post("/profile", response_model=UserProfileDBSchema)
+@router.post("/profile", response_model=UserProfileDBSchema, status_code=201)
 async def create_profile(
     session: AsyncSessionDependency,
     access_token_payload: AccessTokenPayloadDependency,

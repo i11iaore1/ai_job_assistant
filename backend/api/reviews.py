@@ -24,7 +24,7 @@ from services.review_service import (
 router = APIRouter()
 
 
-@router.post("/review-requests", response_model=ReviewRequestDBSchema)
+@router.post("/review-requests", response_model=ReviewRequestDBSchema, status_code=201)
 async def request_vacancy_review(
     session: AsyncSessionDependency,
     payload: ReviewVacancySerializer,

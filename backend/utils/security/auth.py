@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from pydantic import UUID4, BaseModel, Field
 
+from config import app_config
 from serializers.users import RefreshTokenSchema, UserDBSchema
 from utils.jwt_service import jwt_encode
 
@@ -64,7 +65,7 @@ access_token_config = TokenConfig(
         key="access",
         max_age=30 * 60,  # 30 minutes
         httponly=True,
-        path="/",
+        path=f"/api/{app_config.app_version}",
         samesite="lax",
         secure=False,
     ),
@@ -79,7 +80,7 @@ refresh_token_config = TokenConfig(
         key="refresh",
         max_age=7 * 24 * 3600,  # 7 days
         httponly=True,
-        path="/auth",
+        path=f"/api/{app_config.app_version}/auth",
         samesite="lax",
         secure=False,
     ),
