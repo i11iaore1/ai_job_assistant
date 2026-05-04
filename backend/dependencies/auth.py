@@ -1,6 +1,4 @@
-from functools import wraps
-from typing import Annotated, Awaitable, Callable
-from uuid import UUID
+from typing import Annotated
 
 from fastapi import Depends, Request
 from fastapi.security import APIKeyCookie
@@ -74,62 +72,36 @@ RefreshTokenPayloadDependency = Annotated[
     Depends(token_payload_dependency_factory(refresh_token_config)),
 ]
 
+TokenPayloadDependency = (
+    type[AccessTokenPayloadDependency] | type[RefreshTokenPayloadDependency]
+)
 
-def raise_not_found[**P](
-    user_getter: Callable[P, Awaitable[UserModel | None]],
-) -> Callable[P, Awaitable[UserModel]]:
-    @wraps(user_getter)
-    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> UserModel:
-        user = await user_getter(*args, **kwargs)
+
+def user_from_token_dependency_factory(
+    payload_dep: TokenPayloadDependency,
+    with_profile: bool = False,
+):
+    async def get_user_from_token(
+        session: AsyncSessionDependency,
+        payload: payload_dep,
+    ) -> UserModel:
+
+        get_user = (
+            user_repository.get_by_id_with_profile
+            if with_profile
+            else user_repository.get_by_id
+        )
+
+        user = await get_user(
+            id=payload.subject,
+            session=session,
+        )
         if user is None:
             raise UserNotFound()
+
         return user
 
-    return wrapper
-
-
-@raise_not_found
-async def get_user_from_access_token(
-    session: AsyncSessionDependency,
-    payload: AccessTokenPayloadDependency,
-) -> UserModel | None:
-    return await user_repository.get_by_id(
-        id=payload.subject,
-        session=session,
-    )
-
-
-@raise_not_found
-async def get_user_with_profile_from_access_token(
-    session: AsyncSessionDependency,
-    payload: AccessTokenPayloadDependency,
-) -> UserModel | None:
-    return await user_repository.get_by_id_with_profile(
-        id=payload.subject,
-        session=session,
-    )
-
-
-@raise_not_found
-async def get_user_from_refresh_token(
-    session: AsyncSessionDependency,
-    payload: RefreshTokenPayloadDependency,
-) -> UserModel | None:
-    return await user_repository.get_by_id(
-        id=payload.subject,
-        session=session,
-    )
-
-
-@raise_not_found
-async def get_user_with_profile_from_refresh_token(
-    session: AsyncSessionDependency,
-    payload: RefreshTokenPayloadDependency,
-) -> UserModel | None:
-    return await user_repository.get_by_id_with_profile(
-        id=payload.subject,
-        session=session,
-    )
+    return get_user_from_token
 
 
 # async def get_admin_from_access_token(
@@ -153,10 +125,32 @@ def get_refresh_id_if_exists(request: Request) -> UUID | None:
         return None
 
 
-UserFromAccessDependency = Annotated[UserModel, Depends(get_user_from_access_token)]
-FullUserFromAccessDependency = Annotated[
-    UserModel, Depends(get_user_with_profile_from_access_token)
+UserFromAccessDependency = Annotated[
+    UserModel,
+    Depends(
+        user_from_token_dependency_factory(
+            payload_dep=AccessTokenPayloadDependency,
+            with_profile=False,
+        )
+    ),
 ]
-UserFromRefreshDependency = Annotated[UserModel, Depends(get_user_from_refresh_token)]
+FullUserFromAccessDependency = Annotated[
+    UserModel,
+    Depends(
+        user_from_token_dependency_factory(
+            payload_dep=AccessTokenPayloadDependency,
+            with_profile=True,
+        )
+    ),
+]
+UserFromRefreshDependency = Annotated[
+    UserModel,
+    Depends(
+        user_from_token_dependency_factory(
+            payload_dep=RefreshTokenPayloadDependency,
+            with_profile=False,
+        )
+    ),
+]
 
 RefreshIdDependency = Annotated[UUID | None, Depends(get_refresh_id_if_exists)]
