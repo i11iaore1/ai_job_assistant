@@ -13,8 +13,9 @@ from exceptions.jwt_service import (
 )
 from exceptions.user_service import UserNotFound
 from sa.database import AsyncSessionDependency
-from sa.models.users import UserModel
 from sa.repositories import user_repository
+from serializers.users import FullUserInfoSchema
+from services.caching.users import user_caching
 from utils.jwt_service import jwt_decode
 from utils.security.auth import (
     AccessTokenPayloadSchema,
@@ -63,45 +64,61 @@ def token_payload_dependency_factory[T: TokenPayloadSchema](
     return extract_and_validate_payload
 
 
-AccessTokenPayloadDependency = Annotated[
+AccessDep = Annotated[
     AccessTokenPayloadSchema,
     Depends(token_payload_dependency_factory(access_token_config)),
 ]
-RefreshTokenPayloadDependency = Annotated[
+RefreshDep = Annotated[
     RefreshTokenPayloadSchema,
     Depends(token_payload_dependency_factory(refresh_token_config)),
 ]
 
-TokenPayloadDependency = (
-    type[AccessTokenPayloadDependency] | type[RefreshTokenPayloadDependency]
-)
-
 
 def user_from_token_dependency_factory(
-    payload_dep: TokenPayloadDependency,
-    with_profile: bool = False,
+    payload_dep_type: type[AccessDep] | type[RefreshDep],
 ):
     async def get_user_from_token(
+        payload: payload_dep_type,
         session: AsyncSessionDependency,
-        payload: payload_dep,
-    ) -> UserModel:
+    ) -> FullUserInfoSchema:
+        """Dependency for retrieving user data. First searches cache, then the db."""
+        user = await user_caching.get(payload.subject)
+        if user is not None:
+            if user == "":
+                # user does not exist and has already been cached
+                raise UserNotFound()
 
-        get_user = (
-            user_repository.get_by_id_with_profile
-            if with_profile
-            else user_repository.get_by_id
-        )
+            return user
 
-        user = await get_user(
+        user_model = await user_repository.get_by_id_with_profile(
             id=payload.subject,
             session=session,
         )
-        if user is None:
+
+        if user_model is None:
+            await user_caching.add(user_id=payload.subject, user=None)
             raise UserNotFound()
+
+        user = FullUserInfoSchema.model_validate(user_model)
+
+        await user_caching.add(
+            user_id=payload.subject,
+            user=user,
+        )
 
         return user
 
     return get_user_from_token
+
+
+UserFromAccessDep = Annotated[
+    FullUserInfoSchema,
+    Depends(user_from_token_dependency_factory(payload_dep_type=AccessDep)),
+]
+UserFromRefreshDep = Annotated[
+    FullUserInfoSchema,
+    Depends(user_from_token_dependency_factory(payload_dep_type=RefreshDep)),
+]
 
 
 # async def get_admin_from_access_token(
@@ -112,45 +129,19 @@ def user_from_token_dependency_factory(
 #     return current_user
 
 
-def get_refresh_id_if_exists(request: Request) -> UUID | None:
+def get_refresh_if_exists(request: Request) -> RefreshTokenPayloadSchema | None:
     try:
         token = request.cookies.get(refresh_token_config.default_cookie_attrs.key)
         if token is None:
             return None
         payload_dict = jwt_decode(token, verify_exp=False)
         payload_dto = RefreshTokenPayloadSchema.model_validate(payload_dict)
-        return payload_dto.jwt_id
+        return payload_dto
     except (ValueError, PyJWTError, ValidationError):
         # if token is absent or invalid, cookies still should be deleted
         return None
 
 
-UserFromAccessDependency = Annotated[
-    UserModel,
-    Depends(
-        user_from_token_dependency_factory(
-            payload_dep=AccessTokenPayloadDependency,
-            with_profile=False,
-        )
-    ),
+OptionalRefreshDep = Annotated[
+    RefreshTokenPayloadSchema | None, Depends(get_refresh_if_exists)
 ]
-FullUserFromAccessDependency = Annotated[
-    UserModel,
-    Depends(
-        user_from_token_dependency_factory(
-            payload_dep=AccessTokenPayloadDependency,
-            with_profile=True,
-        )
-    ),
-]
-UserFromRefreshDependency = Annotated[
-    UserModel,
-    Depends(
-        user_from_token_dependency_factory(
-            payload_dep=RefreshTokenPayloadDependency,
-            with_profile=False,
-        )
-    ),
-]
-
-RefreshIdDependency = Annotated[UUID | None, Depends(get_refresh_id_if_exists)]

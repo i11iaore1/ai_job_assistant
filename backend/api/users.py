@@ -2,12 +2,11 @@ from fastapi import APIRouter, Form, Response
 from fastapi.responses import StreamingResponse
 
 from dependencies.auth import (
-    AccessTokenPayloadDependency,
-    FullUserFromAccessDependency,
-    RefreshIdDependency,
-    RefreshTokenPayloadDependency,
-    UserFromAccessDependency,
-    UserFromRefreshDependency,
+    AccessDep,
+    OptionalRefreshDep,
+    RefreshDep,
+    UserFromAccessDep,
+    UserFromRefreshDep,
 )
 from dependencies.file_validation import (
     OptionalResumeFileDependency,
@@ -15,11 +14,7 @@ from dependencies.file_validation import (
 )
 from exceptions.jwt_service import TokenReuse
 from sa.database import AsyncSessionDependency
-from sa.operations.refresh_tokens import (
-    delete_all_user_refresh_tokens,
-    delete_refresh_token,
-)
-from sa.repositories import user_repository
+from sa.operations.refresh_tokens import delete_all_user_refresh_tokens
 from serializers.response import StatusResponse
 from serializers.users import (
     FullUserInfoSchema,
@@ -42,8 +37,10 @@ from services.user_service import (
     get_profile_if_exists,
     get_resume_file,
     login_user,
+    logout_user,
     register_new_user,
     update_profile,
+    update_user,
 )
 
 router = APIRouter()
@@ -86,29 +83,29 @@ async def login(
 
 
 @router.get("/me", response_model=FullUserInfoSchema)
-def get_full_user_info(current_user: FullUserFromAccessDependency):
+def get_full_user_info(current_user: UserFromAccessDep):
     return current_user
 
 
 @router.patch("/me", response_model=UserDBSchema)
-async def update_user(
-    session: AsyncSessionDependency,
-    current_user: UserFromAccessDependency,
+async def update_current_user(
     payload: UpdateUserSchema,
+    access: AccessDep,
+    session: AsyncSessionDependency,
 ):
-    await user_repository.update(
-        instance=current_user,
-        data=payload.model_dump(exclude_unset=True),
+    updated_user = await update_user(
+        user_id=access.subject,
+        data_to_update=payload.model_dump(exclude_unset=True),
         session=session,
     )
     await session.commit()
-    return current_user
+    return updated_user
 
 
 @router.delete("/me", status_code=204)
 async def delete_current_user(
+    current_user: UserFromAccessDep,
     session: AsyncSessionDependency,
-    current_user: FullUserFromAccessDependency,
 ):
     await delete_user(user=current_user, session=session)
     await session.commit()
@@ -117,12 +114,12 @@ async def delete_current_user(
 
 @router.post("/auth/logout", status_code=200)
 async def logout(
-    session: AsyncSessionDependency,
-    refresh_id: RefreshIdDependency,
     response: Response,
+    refresh: OptionalRefreshDep,
+    session: AsyncSessionDependency,
 ):
-    if refresh_id is not None:
-        await delete_refresh_token(session=session, token_id=refresh_id)
+    if refresh is not None:
+        await logout_user(session=session, refresh=refresh)
         await session.commit()
     delete_token_cookies(response)
     return StatusResponse(message="Logged out")
@@ -130,15 +127,15 @@ async def logout(
 
 @router.post("/auth/refresh", status_code=200)
 async def refresh(
-    session: AsyncSessionDependency,
-    refresh_payload: RefreshTokenPayloadDependency,
-    current_user: UserFromRefreshDependency,
     response: Response,
+    refresh: RefreshDep,
+    current_user: UserFromRefreshDep,
+    session: AsyncSessionDependency,
 ):
     try:
         await delete_previous_refresh_token(
             session=session,
-            token_id=refresh_payload.jwt_id,
+            token=refresh,
         )
     except TokenReuse:
         await delete_all_user_refresh_tokens(session=session, user_id=current_user.id)
@@ -148,7 +145,7 @@ async def refresh(
     token_pair = await generate_token_pair(
         session=session,
         user=user_dto,
-        persistant=refresh_payload.is_persistant,
+        persistant=refresh.is_persistant,
     )
     await session.commit()
     set_token_cookies(token_pair=token_pair, response=response)
@@ -157,9 +154,9 @@ async def refresh(
 
 @router.post("/profile", response_model=UserProfileDBSchema, status_code=201)
 async def create_profile(
-    session: AsyncSessionDependency,
-    access_token_payload: AccessTokenPayloadDependency,
     resume_file: ResumeFileDependency,
+    access_token_payload: AccessDep,
+    session: AsyncSessionDependency,
     context: str = Form(...),
 ):
     file_bytes = await resume_file.read()
@@ -177,8 +174,8 @@ async def create_profile(
 
 @router.get("/profile", response_model=UserProfileDBSchema)
 async def get_profile(
+    access_token_payload: AccessDep,
     session: AsyncSessionDependency,
-    access_token_payload: AccessTokenPayloadDependency,
 ):
     profile = await get_profile_if_exists(
         session=session, user_id=access_token_payload.subject
@@ -189,8 +186,8 @@ async def get_profile(
 @router.get("/resume-file", response_class=StreamingResponse)
 async def get_file(
     resume_file_path: str,
+    access_token_payload: AccessDep,
     session: AsyncSessionDependency,
-    access_token_payload: AccessTokenPayloadDependency,
 ):
     file_stream, metadata = await get_resume_file(
         resume_file_path=resume_file_path,
@@ -211,27 +208,27 @@ async def get_file(
 
 @router.patch("/profile", response_model=UserProfileDBSchema)
 async def update_user_profile(
-    session: AsyncSessionDependency,
-    current_user: FullUserFromAccessDependency,
+    access: AccessDep,
     resume_file: OptionalResumeFileDependency,
+    session: AsyncSessionDependency,
     context: str | None = Form(None),
 ):
-    await update_profile(
+    updated_profile = await update_profile(
         session=session,
-        profile=current_user.profile,
+        user_id=access.subject,
         resume_file=resume_file,
         context=context,
     )
 
     await session.commit()
-    return current_user.profile
+    return updated_profile
 
 
 @router.delete("/profile", status_code=204)
 async def delete_user_profile(
     session: AsyncSessionDependency,
-    current_user: FullUserFromAccessDependency,
+    access: AccessDep,
 ):
-    await delete_profile(profile=current_user.profile, session=session)
+    await delete_profile(user_id=access.subject, session=session)
     await session.commit()
     return None

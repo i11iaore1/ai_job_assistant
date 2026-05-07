@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, timezone
-from uuid import UUID
 
 from fastapi import Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +10,7 @@ from sa.operations.refresh_tokens import (
 )
 from serializers.users import UserDBSchema
 from utils.security.auth import (
+    RefreshTokenPayloadSchema,
     TokenPair,
     access_token_config,
     generate_access_token,
@@ -49,9 +49,9 @@ async def generate_token_pair(
 
 async def delete_previous_refresh_token(
     session: AsyncSession,
-    token_id: UUID,
+    token: RefreshTokenPayloadSchema,
 ) -> None:
-    was_deleted = await delete_refresh_token(session=session, token_id=token_id)
+    was_deleted = await delete_refresh_token(session=session, token=token)
     if not was_deleted:
         raise TokenReuse()
 

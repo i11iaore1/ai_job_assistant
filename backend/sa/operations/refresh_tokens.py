@@ -1,5 +1,3 @@
-from uuid import UUID
-
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -7,6 +5,7 @@ from sa.models.users import RefreshTokenModel
 from serializers.users import (
     RefreshTokenSchema,
 )
+from utils.security.auth import RefreshTokenPayloadSchema
 
 
 async def record_refresh_token(
@@ -18,8 +17,11 @@ async def record_refresh_token(
     await session.flush()
 
 
-async def delete_refresh_token(session: AsyncSession, token_id: UUID) -> bool:
-    token = await session.get(RefreshTokenModel, token_id)
+async def delete_refresh_token(
+    session: AsyncSession,
+    token: RefreshTokenPayloadSchema,
+) -> bool:
+    token = await session.get(RefreshTokenModel, token.jwt_id)
     if token:
         await session.delete(token)
         await session.flush()

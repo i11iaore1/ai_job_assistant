@@ -1,4 +1,4 @@
-from typing import AsyncGenerator, NamedTuple
+from typing import Any, AsyncGenerator, NamedTuple
 from uuid import uuid4
 
 from fastapi import UploadFile
@@ -10,25 +10,31 @@ from exceptions.user_service import (
     NoProfile,
     NotResumeOwner,
     ProfileConflict,
+    UserNotFound,
     WrongCredentials,
 )
 from sa.models.users import UserModel, UserProfileModel
+from sa.operations.refresh_tokens import delete_refresh_token
 from sa.repositories import user_profile_repository, user_repository
 from serializers.users import (
     CreateUserProfileSchema,
     CreateUserSchema,
+    FullUserInfoSchema,
     LoginSerializer,
     RegistrationSerializer,
     UpdateUserProfileSchema,
+    UserDBSchema,
 )
+from services.caching.users import user_caching
 from services.s3_service import s3_client
 from services.s3_service.models import FileMetadata
 from utils.pdf_processing import get_pdf_text_from_stream
+from utils.security.auth import RefreshTokenPayloadSchema
 
 
 async def register_new_user(
-    session: AsyncSession,
     user_input: RegistrationSerializer,
+    session: AsyncSession,
     is_admin: bool = False,
 ) -> UserModel:
     if not user_input.username:
@@ -41,30 +47,70 @@ async def register_new_user(
         )
     except IntegrityError:
         raise EmailConflict()
+
+    full_user_info = FullUserInfoSchema(
+        **UserDBSchema.model_validate(new_user).model_dump(), profile=None
+    )
+    await user_caching.add(user_id=new_user.id, user=full_user_info)
     return new_user
 
 
-async def login_user(session: AsyncSession, payload: LoginSerializer) -> UserModel:
+async def login_user(
+    payload: LoginSerializer,
+    session: AsyncSession,
+) -> UserModel:
     user = await user_repository.get_by_email_with_profile(
         session=session,
         email=payload.email,
     )
     if user is None or not user.verify_password(payload.password):
         raise WrongCredentials()
+    await user_caching.add(user_id=user.id, user=user)
     return user
 
 
-async def delete_user(user: UserModel, session: AsyncSession) -> None:
+async def logout_user(
+    refresh: RefreshTokenPayloadSchema,
+    session: AsyncSession,
+) -> bool:
+    result = delete_refresh_token(session=session, token=refresh)
+    if result:
+        await user_caching.remove(refresh.subject)
+    return result
+
+
+async def update_user(
+    user_id: int,
+    data_to_update: dict[str, Any],
+    session: AsyncSession,
+) -> UserModel:
+    updated_user = await user_repository.update_by_id(
+        id=user_id,
+        data=data_to_update,
+        session=session,
+    )
+    if updated_user is None:
+        raise UserNotFound()
+
+    await user_caching.remove(user_id)
+    return updated_user
+
+
+async def delete_user(
+    user: FullUserInfoSchema,
+    session: AsyncSession,
+) -> None:
     if user.profile is not None:
         await s3_client.delete_file(user.profile.resume_file_path)
-    await user_repository.delete(instance=user, session=session)
+    await user_repository.delete_by_id(id=user.id, session=session)
+    await user_caching.remove(user.id)
 
 
 async def create_profile_if_not_exist(
-    session: AsyncSession,
     user_id: int,
     file_bytes: bytes,
     context: str,
+    session: AsyncSession,
 ) -> UserProfileModel:
     object_name = f"{uuid4()}.pdf"
     file_text = get_pdf_text_from_stream(file_bytes)
@@ -80,6 +126,7 @@ async def create_profile_if_not_exist(
         new_profile = await user_profile_repository.create(data=data, session=session)
     except IntegrityError:
         raise ProfileConflict()
+    await user_caching.remove(user_id)
 
     await s3_client.put_file(data=file_bytes, object_name=object_name)
 
@@ -87,7 +134,8 @@ async def create_profile_if_not_exist(
 
 
 async def get_profile_if_exists(
-    session: AsyncSession, user_id: int
+    user_id: int,
+    session: AsyncSession,
 ) -> UserProfileModel:
     profile = await user_profile_repository.get_by_id(id=user_id, session=session)
     if profile is None:
@@ -118,11 +166,13 @@ async def get_resume_file(
 
 
 async def update_profile(
-    session: AsyncSession,
-    profile: UserProfileModel | None,
+    user_id: int,
     resume_file: UploadFile | None,
+    session: AsyncSession,
     context: str | None,
-) -> None:
+) -> UserProfileModel:
+    profile = await user_profile_repository.get_by_id(id=user_id, session=session)
+
     if profile is None:
         raise NoProfile()
 
@@ -146,24 +196,30 @@ async def update_profile(
 
     data = info_to_update.model_dump(exclude_unset=True)
 
-    await user_profile_repository.update(
+    updated_profile = await user_profile_repository.update(
         instance=profile,
         data=data,
         session=session,
     )
+    await user_caching.remove(profile.user_id)
 
     if resume_file:
         await s3_client.put_file(data=file_bytes, object_name=profile.resume_file_path)
 
         await s3_client.delete_file(current_object_name)
 
+    return updated_profile
+
 
 async def delete_profile(
-    profile: UserProfileModel | None,
+    user_id: int,
     session: AsyncSession,
 ) -> None:
+    profile = await user_profile_repository.get_by_id(id=user_id, session=session)
     if profile is None:
         raise NoProfile()
 
-    await s3_client.delete_file(profile.resume_file_path)
     await user_profile_repository.delete(instance=profile, session=session)
+
+    await s3_client.delete_file(profile.resume_file_path)
+    await user_caching.remove(profile.user_id)

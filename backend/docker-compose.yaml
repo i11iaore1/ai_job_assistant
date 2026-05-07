@@ -21,6 +21,8 @@ services:
       PSQL_HOST: database
       PSQL_PORT: 5432
       MINIO_HOST: http://minio
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     restart: unless-stopped
   database:
     networks:
@@ -40,6 +42,15 @@ services:
       timeout: 2s
       retries: 5
       start_period: 3s
+    restart: unless-stopped
+  redis:
+    networks:
+      - dev
+    image: redis:alpine
+    ports:
+      - "${REDIS_EXT_PORT}:6379"
+    volumes:
+      - redis_data:/data
     restart: unless-stopped
   minio:
     networks:
@@ -72,3 +83,4 @@ services:
 volumes:
   postgres_data:
   minio_data:
+  redis_data:
