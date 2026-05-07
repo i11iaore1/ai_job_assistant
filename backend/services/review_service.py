@@ -7,17 +7,18 @@ from sse_starlette import JSONServerSentEvent
 
 from exceptions.review_service import ReviewNotFound
 from exceptions.user_service import NoProfile
-from sa.models import ReviewModel, UserModel
+from sa.models import ReviewModel
 from sa.models.reviews import ReviewRequestModel, ReviewRequestStatus
 from sa.models.users import UserProfileModel
 from sa.repositories import review_repository, review_request_repository
 from serializers.reviews import ReviewDBSchema
+from serializers.users import FullUserInfoSchema
 from services.llm_service import llm_client
 
 
 async def create_review_request(
     data: dict[str, Any],
-    user: UserModel,
+    user: FullUserInfoSchema,
     session: AsyncSession,
 ) -> ReviewRequestModel:
     if user.profile is None:
