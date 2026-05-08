@@ -82,36 +82,6 @@ async def login(
     return user_dto
 
 
-@router.get("/me", response_model=FullUserInfoSchema)
-def get_full_user_info(current_user: UserFromAccessDep):
-    return current_user
-
-
-@router.patch("/me", response_model=UserDBSchema)
-async def update_current_user(
-    payload: UpdateUserSchema,
-    access: AccessDep,
-    session: AsyncSessionDependency,
-):
-    updated_user = await update_user(
-        user_id=access.subject,
-        data_to_update=payload.model_dump(exclude_unset=True),
-        session=session,
-    )
-    await session.commit()
-    return updated_user
-
-
-@router.delete("/me", status_code=204)
-async def delete_current_user(
-    current_user: UserFromAccessDep,
-    session: AsyncSessionDependency,
-):
-    await delete_user(user=current_user, session=session)
-    await session.commit()
-    return None
-
-
 @router.post("/auth/logout", status_code=200)
 async def logout(
     response: Response,
@@ -150,6 +120,37 @@ async def refresh(
     await session.commit()
     set_token_cookies(token_pair=token_pair, response=response)
     return StatusResponse(message="Refreshed")
+
+
+
+@router.get("/me", response_model=FullUserInfoSchema)
+def get_full_user_info(current_user: UserFromAccessDep):
+    return current_user
+
+
+@router.patch("/me", response_model=UserDBSchema)
+async def update_current_user(
+    payload: UpdateUserSchema,
+    access: AccessDep,
+    session: AsyncSessionDependency,
+):
+    updated_user = await update_user(
+        user_id=access.subject,
+        data_to_update=payload.model_dump(exclude_unset=True),
+        session=session,
+    )
+    await session.commit()
+    return updated_user
+
+
+@router.delete("/me", status_code=204)
+async def delete_current_user(
+    current_user: UserFromAccessDep,
+    session: AsyncSessionDependency,
+):
+    await delete_user(user=current_user, session=session)
+    await session.commit()
+    return None
 
 
 @router.post("/profile", response_model=UserProfileDBSchema, status_code=201)

@@ -1,3 +1,1 @@
 - Celery for cleaning expired refresh-tokens in postgres
-- readable API Documentation
-  - reorder api functions
