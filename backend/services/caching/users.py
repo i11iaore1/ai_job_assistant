@@ -2,8 +2,9 @@ from typing import assert_never
 
 from sa.models import UserModel
 from serializers.users import FullUserInfoSchema
-from services.caching.protocol import AsyncCachingClient
-from services.caching.redis_service.client import redis_client
+from services.redis_service import redis_client
+
+from .protocol import AsyncCachingClient
 
 
 class UserCaching:

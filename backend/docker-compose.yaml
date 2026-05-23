@@ -8,8 +8,7 @@ services:
     depends_on:
       database:
         condition: service_healthy
-    build:
-      context: ./
+    build: .
     command: --port 8000 --reload
     ports:
       - "8000:8000"
@@ -43,12 +42,76 @@ services:
       retries: 5
       start_period: 3s
     restart: unless-stopped
+  rabbitmq:
+    networks:
+      - dev
+    image: rabbitmq:3-management
+    ports:
+      - "${RABBITMQ_EXT_PORT}:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+  celery_beat:
+    networks:
+      - dev
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      database:
+        condition: service_healthy
+    build: .
+    entrypoint: []
+    command: celery -A celery_tasks.refresh_cleanup beat --loglevel=info
+    volumes:
+      - ./data:/data
+    env_file:
+      - .env
+    environment:
+      PSQL_HOST: database
+      PSQL_PORT: 5432
+      MINIO_HOST: http://minio
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+    restart: unless-stopped
+  celery_worker:
+    networks:
+      - dev
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      database:
+        condition: service_healthy
+    build: .
+    entrypoint: []
+    command: celery -A celery_tasks.refresh_cleanup worker --loglevel=info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      PSQL_HOST: database
+      PSQL_PORT: 5432
+      MINIO_HOST: http://minio
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+    restart: unless-stopped
   redis:
     networks:
       - dev
     image: redis:alpine
-    ports:
-      - "${REDIS_EXT_PORT}:6379"
     volumes:
       - redis_data:/data
     restart: unless-stopped
@@ -82,5 +145,6 @@ services:
 
 volumes:
   postgres_data:
+  rabbitmq_data:
   minio_data:
   redis_data:
